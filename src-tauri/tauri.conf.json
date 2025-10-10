@@ -1,0 +1,37 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "SnippetVault",
+  "version": "0.1.0",
+  "identifier": "com.snippetvault.app",
+  "build": {
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "cd ../ui && npm run build",
+    "frontendDist": "../ui/dist"
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "fullscreen": false,
+        "resizable": true,
+        "title": "SnippetVault",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    }
+  }
+}

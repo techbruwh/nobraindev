@@ -1,0 +1,41 @@
+[package]
+name = "snippet-vault"
+version = "0.1.0"
+description = "A local code snippet manager with AI-powered semantic search"
+authors = ["you"]
+license = ""
+repository = ""
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0", features = [] }
+tauri-plugin-dialog = "2.0"
+tauri-plugin-fs = "2.0"
+tauri-plugin-shell = "2.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rusqlite = { version = "0.31", features = ["bundled"] }
+chrono = { version = "0.4", features = ["serde"] }
+anyhow = "1.0"
+tokio = { version = "1", features = ["full"] }
+llm = "0.1"
+dirs = "5.0"
+reqwest = { version = "0.12", features = ["json", "stream"] }
+futures-util = "0.3"
+ort = { version = "2.0.0-rc.10", features = ["download-binaries"] }
+tokenizers = "0.20"
+ndarray = "0.16"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
+

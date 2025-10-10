@@ -1,0 +1,19 @@
+# Cargo configuration for faster builds
+
+[build]
+# Use all CPU cores
+jobs = 4
+
+[profile.dev]
+# Faster compile times in dev
+opt-level = 1
+
+[profile.dev.package."*"]
+# Optimize dependencies even in dev mode
+opt-level = 2
+
+# Uncomment for faster linking on Linux
+# [target.x86_64-unknown-linux-gnu]
+# linker = "clang"
+# rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
