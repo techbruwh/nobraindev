@@ -11,10 +11,10 @@
     "active": true,
     "targets": "all",
     "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.png"
+      "icons/web/icon-192.png",
+      "icons/web/icon-512.png",
+      "icons/macos/AppIcon.icns",
+      "icons/web/favicon.ico"
     ],
     "windows": {
       "certificateThumbprint": null,

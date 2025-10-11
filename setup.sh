@@ -102,10 +102,9 @@ fi
 
 echo ""
 
-# 4. Generate icons
-echo "📦 Step 4: Setting up icons..."
-echo "Note: You'll need to generate proper icons later using:"
-echo "      cargo tauri icon path/to/your/icon.png"
+# 4. Icons are already set up
+echo "📦 Step 4: Icons configured..."
+echo "✅ Icons are ready in src-tauri/icons/"
 echo ""
 
 # 5. Make scripts executable
