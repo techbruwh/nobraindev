@@ -31,10 +31,10 @@ impl Database {
     fn get_db_path() -> Result<PathBuf> {
         let app_data = dirs::data_local_dir()
             .context("Failed to get app data directory")?
-            .join("snippet-vault");
+            .join("nobraindev");
         
         std::fs::create_dir_all(&app_data)?;
-        Ok(app_data.join("snippets.db"))
+        Ok(app_data.join("nobraindev.db"))
     }
 
     fn initialize(&self) -> Result<()> {

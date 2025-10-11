@@ -53,7 +53,7 @@ cargo build
 The AI search feature requires downloading a model (~90MB). If it fails:
 ```bash
 # Check model directory
-ls -lh ~/.local/share/snippet-vault/models/all-MiniLM-L6-v2/
+ls -lh ~/.local/share/nobraindev/models/all-MiniLM-L6-v2/
 
 # The app will show an error message if the model can't be loaded
 ```

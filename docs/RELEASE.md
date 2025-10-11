@@ -18,7 +18,7 @@ Update the version in **two places**:
 **1. `src-tauri/Cargo.toml`:**
 ```toml
 [package]
-name = "snippet-vault"
+name = "nobraindev"
 version = "0.2.0"  # Update this
 # ...
 ```

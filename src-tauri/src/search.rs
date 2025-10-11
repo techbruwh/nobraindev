@@ -211,7 +211,7 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 pub fn get_models_dir() -> Result<PathBuf> {
     let models_dir = dirs::data_local_dir()
         .context("Failed to get app data directory")?
-        .join("snippet-vault")
+        .join("nobraindev")
         .join("models");
 
     std::fs::create_dir_all(&models_dir)?;

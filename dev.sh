@@ -33,7 +33,7 @@ fi
 
 # Kill any existing processes
 pkill -f "vite" 2>/dev/null || true
-pkill -f "snippet-vault" 2>/dev/null || true
+pkill -f "nobraindev" 2>/dev/null || true
 sleep 1
 
 echo "🎨 Starting frontend dev server..."
