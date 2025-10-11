@@ -10,15 +10,15 @@
   ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 </div>
 
-## ✨ Features
-- 📝 **Organize Code Snippets** - Store and manage code snippets across multiple languages
-- 🔍 **Smart Search** - Keyword-based search with filtering by title, tags, and content
-- 🤖 **AI Semantic Search** - Natural language search powered by Small Language Models (SLM)
-- 🎨 **Modern UI** - Beautiful interface built with React, Tailwind CSS, and shadcn/ui
-- 💾 **Local Storage** - All data stored locally in SQLite database
-- ⚡ **Fast & Lightweight** - Built with Rust and Tauri for native performance
+## Features
+- **Organize Code Snippets** - Store and manage code snippets across multiple languages
+- **Smart Search** - Keyword-based search with filtering by title, tags, and content
+- **AI Semantic Search** - Natural language search powered by Small Language Models (SLM)
+- **Modern UI** - Beautiful interface built with React, Tailwind CSS, and shadcn/ui
+- **Local Storage** - All data stored locally in SQLite database
+- **Fast & Lightweight** - Built with Rust and Tauri for native performance
 
-## 📥 Installation (macOS)
+## Installation (macOS)
 
 ```bash
 brew tap techbruwh/nobraindev
@@ -37,7 +37,7 @@ Update: `brew upgrade nobraindev`
 
 **That's it!** No setup, no configuration needed.
 
-## 🛠️ Built With
+## Built With
 
 React • Rust • Tauri • SQLite • AI/ML
 
@@ -61,7 +61,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 [Open an issue](https://github.com/techbruwh/nobraindev/issues) and we'll help!
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [Tauri](https://tauri.app/) - Desktop app framework
 - [sentence-transformers](https://www.sbert.net/) - AI model for semantic search
