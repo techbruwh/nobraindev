@@ -68,6 +68,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Tauri](https://tauri.app/) - Desktop app framework
 - [sentence-transformers](https://www.sbert.net/) - AI model for semantic search
 - [shadcn/ui](https://ui.shadcn.com/) - UI components
+- [IconKitchen](https://icon.kitchen/) - Icon Generator
 
 ---
 
