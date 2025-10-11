@@ -1,6 +1,6 @@
 [package]
 name = "snippet-vault"
-version = "0.1.0"
+version = "0.1.1"
 description = "NoBrainDev - AI-powered code snippet manager with semantic search"
 authors = ["TechBruwh"]
 license = "MIT"

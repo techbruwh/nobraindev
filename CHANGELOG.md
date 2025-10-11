@@ -16,6 +16,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - 
 
+## [0.1.1] - 2025-01-10
+
+### Added
+- Comprehensive icon set for all platforms (iOS, Android, macOS, Web)
+- App icon in README.md
+
+### Changed
+- Updated icon configuration in tauri.conf.json to use organized icon structure
+- Updated setup.sh to use libwebkit2gtk-4.1-dev (Ubuntu 22.04+ compatibility)
+- Updated GitHub Actions workflow to use libwebkit2gtk-4.1-dev
+
+### Fixed
+- Fixed missing icon files error during build (removed references to non-existent .icns and .ico)
+- Fixed dependency installation error in setup.sh for newer Ubuntu/Debian versions
+- Fixed GitHub Actions build error due to outdated webkit package name
+
 ## [0.1.0] - 2025-01-10
 
 ### Added
@@ -38,6 +54,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🎨 Beautiful modern interface
 - ⚡ Fast and lightweight desktop app built with Tauri
 
-[unreleased]: https://github.com/techbruwh/nobraindev/compare/v0.1.0...HEAD
+[unreleased]: https://github.com/techbruwh/nobraindev/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/techbruwh/nobraindev/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/techbruwh/nobraindev/releases/tag/v0.1.0
-
