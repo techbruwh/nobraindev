@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# SnippetVault Setup Script
-# This script sets up the development environment for SnippetVault
+# NoBrainDev Setup Script
+# This script sets up the development environment for NoBrainDev
 
 set -e
 
-echo "🎯 SnippetVault Setup"
+echo "🎯 NoBrainDev Setup"
 echo "===================="
 echo ""
 
