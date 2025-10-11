@@ -31,14 +31,6 @@ Update: `brew upgrade nobraindev`
 
 [Tap repository →](https://github.com/techbruwh/homebrew-nobraindev)
 
-## 🚀 Quick Start
-
-1. Click `+` to create a snippet
-2. Add your code, title, and tags
-3. Save and search instantly!
-
-**That's it!** No setup, no configuration needed.
-
 ## Built With
 
 React • Rust • Tauri • SQLite • AI/ML
