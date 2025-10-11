@@ -1,10 +1,10 @@
 [package]
 name = "snippet-vault"
 version = "0.1.0"
-description = "A local code snippet manager with AI-powered semantic search"
-authors = ["you"]
-license = ""
-repository = ""
+description = "NoBrainDev - AI-powered code snippet manager with semantic search"
+authors = ["TechBruwh"]
+license = "MIT"
+repository = "https://github.com/techbruwh/nobraindev"
 edition = "2021"
 
 [build-dependencies]
