@@ -27,9 +27,12 @@ brew tap techbruwh/nobraindev
 brew install nobraindev
 ```
 
-Update: `brew upgrade nobraindev`
-
-[Tap repository →](https://github.com/techbruwh/homebrew-nobraindev)
+Update: 
+```bash
+brew update
+brew tap techbruwh/nobraindev
+brew upgrade nobraindev
+```
 
 ## Built With
 
