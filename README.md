@@ -1,13 +1,16 @@
-# 🧠 NoBrainDev
-
-A powerful, AI-powered desktop application for managing your code snippets with semantic search capabilities.
-
-![NoBrainDev](https://img.shields.io/badge/version-0.1.0-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
-![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
+<div align="center">
+  <img src="src-tauri/icons/web/icon-512.png" alt="NoBrainDev Logo" width="200">
+  
+  # NoBrainDev
+  
+  ### A powerful, tiny, AI-powered desktop application for managing your code snippets written in Rust.
+  
+  ![NoBrainDev](https://img.shields.io/badge/version-0.1.0-blue)
+  ![License](https://img.shields.io/badge/license-MIT-green)
+  ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
+</div>
 
 ## ✨ Features
-
 - 📝 **Organize Code Snippets** - Store and manage code snippets across multiple languages
 - 🔍 **Smart Search** - Keyword-based search with filtering by title, tags, and content
 - 🤖 **AI Semantic Search** - Natural language search powered by Small Language Models (SLM)
