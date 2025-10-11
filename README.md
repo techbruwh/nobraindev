@@ -18,6 +18,8 @@
 - **Local Storage** - All data stored locally in SQLite database
 - **Fast & Lightweight** - Built with Rust and Tauri for native performance
 
+<img width="2266" height="1500" alt="image" src="https://github.com/user-attachments/assets/b9155604-0483-48df-b0c6-56267ccc1cc3" />
+
 ## Installation (macOS)
 
 ```bash
