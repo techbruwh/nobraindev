@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="src-tauri/icons/web/icon-512.png" alt="NoBrainDev Logo" width="200">
+  <img src="src-tauri/icons/web/icon-512.png" alt="NoBrainDev Logo" width="70">
   
   # NoBrainDev
   
