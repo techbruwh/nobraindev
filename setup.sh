@@ -31,8 +31,37 @@ fi
 
 echo ""
 
-# 2. Install system dependencies for Tauri
-echo "📦 Step 2: Installing system dependencies..."
+# 2. Install Node.js via NVM
+echo "📦 Step 2: Installing Node.js..."
+if command -v node &> /dev/null; then
+    echo "✅ Node.js is already installed: $(node --version)"
+else
+    echo "Installing NVM (Node Version Manager)..."
+    if [ -d "$HOME/.nvm" ]; then
+        echo "✅ NVM is already installed"
+    else
+        # Get the latest NVM version from GitHub API
+        NVM_LATEST=$(curl -s https://api.github.com/repos/nvm-sh/nvm/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        echo "Installing NVM ${NVM_LATEST}..."
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_LATEST}/install.sh | bash
+        echo "✅ NVM installed successfully"
+    fi
+    
+    # Load NVM
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    
+    # Install latest LTS version of Node.js
+    echo "Installing Node.js LTS..."
+    nvm install --lts
+    nvm use --lts
+    echo "✅ Node.js installed successfully: $(node --version)"
+fi
+
+echo ""
+
+# 3. Install system dependencies for Tauri
+echo "📦 Step 3: Installing system dependencies..."
 echo "Checking for required packages..."
 
 # Detect Linux distribution
@@ -90,8 +119,22 @@ esac
 echo "✅ System dependencies installed"
 echo ""
 
-# 3. Install Tauri CLI
-echo "📦 Step 3: Installing Tauri CLI..."
+# 4. Install npm dependencies for UI
+echo "📦 Step 4: Installing UI dependencies..."
+if [ -d "ui/node_modules" ]; then
+    echo "✅ UI dependencies already installed"
+else
+    echo "Installing UI dependencies..."
+    cd ui
+    npm install
+    cd ..
+    echo "✅ UI dependencies installed successfully"
+fi
+
+echo ""
+
+# 5. Install Tauri CLI
+echo "📦 Step 5: Installing Tauri CLI..."
 if cargo tauri --version &> /dev/null; then
     echo "✅ Tauri CLI is already installed: $(cargo tauri --version)"
 else
@@ -102,13 +145,13 @@ fi
 
 echo ""
 
-# 4. Icons are already set up
-echo "📦 Step 4: Icons configured..."
+# 6. Icons are already set up
+echo "📦 Step 6: Icons configured..."
 echo "✅ Icons are ready in src-tauri/icons/"
 echo ""
 
-# 5. Make scripts executable
-echo "📦 Step 5: Making scripts executable..."
+# 7. Make scripts executable
+echo "📦 Step 7: Making scripts executable..."
 chmod +x dev.sh build.sh run.sh 2>/dev/null || true
 echo "✅ Scripts are now executable"
 
