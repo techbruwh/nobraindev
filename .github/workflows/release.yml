@@ -119,6 +119,7 @@ jobs:
     needs: release
     runs-on: macos-latest
     if: startsWith(github.ref, 'refs/tags/v')
+    timeout-minutes: 45
 
     steps:
       - name: Checkout repository
@@ -150,11 +151,44 @@ jobs:
           for dmg in *.dmg; do
             echo "🔍 Notarizing $dmg..."
             
-            xcrun notarytool submit "$dmg" \
+            # Submit without waiting first
+            SUBMISSION_ID=$(xcrun notarytool submit "$dmg" \
               --apple-id "$APPLE_ID" \
               --password "$APPLE_PASSWORD" \
               --team-id "$APPLE_TEAM_ID" \
-              --wait
+              --output-format json | jq -r '.id')
+            
+            echo "Submission ID: $SUBMISSION_ID"
+            
+            # Wait for up to 30 minutes with polling
+            echo "Waiting for notarization (polling every 10 seconds, max 30 minutes)..."
+            START_TIME=$(date +%s)
+            MAX_WAIT=$((30 * 60))  # 30 minutes in seconds
+            
+            while true; do
+              STATUS=$(xcrun notarytool info "$SUBMISSION_ID" \
+                --apple-id "$APPLE_ID" \
+                --password "$APPLE_PASSWORD" \
+                --team-id "$APPLE_TEAM_ID" \
+                --output-format json | jq -r '.status')
+              
+              ELAPSED=$(($(date +%s) - START_TIME))
+              echo "Status: $STATUS (Elapsed: ${ELAPSED}s)"
+              
+              if [ "$STATUS" = "Accepted" ]; then
+                echo "✅ Notarization accepted!"
+                break
+              elif [ "$STATUS" = "Rejected" ] || [ "$STATUS" = "Invalid" ]; then
+                echo "❌ Notarization rejected!"
+                exit 1
+              elif [ "$ELAPSED" -gt "$MAX_WAIT" ]; then
+                echo "⏱️  Timeout after 30 minutes. Check status manually at Apple Developer."
+                echo "Submission ID: $SUBMISSION_ID"
+                exit 1
+              fi
+              
+              sleep 10
+            done
             
             echo "📎 Stapling $dmg..."
             xcrun stapler staple "$dmg"
