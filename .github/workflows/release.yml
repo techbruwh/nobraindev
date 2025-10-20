@@ -95,18 +95,12 @@ jobs:
           # Allow codesign to access the keychain
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
 
-      - name: Build Tauri app
+      - name: Build Tauri app (without automatic notarization)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # macOS signing and notarization
+          # Disable Tauri's built-in notarization - we'll do it separately
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          # Enable Tauri's built-in notarization
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'NoBrainDev ${{ github.ref_name }}'
@@ -120,3 +114,64 @@ jobs:
         if: always() && matrix.platform.os == 'macos-latest'
         run: |
           security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
+
+  # Separate job for notarization
+  notarize:
+    needs: release
+    runs-on: macos-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Download DMGs from release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_TAG=${{ github.ref_name }}
+          RELEASE_ID=$(gh release view $RELEASE_TAG --json id -q .id)
+          
+          mkdir -p dmgs
+          cd dmgs
+          
+          # Download both DMGs
+          gh release download $RELEASE_TAG -p "*.dmg"
+          
+          ls -lh
+
+      - name: Notarize DMGs
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          cd dmgs
+          
+          for dmg in *.dmg; do
+            echo "🔍 Notarizing $dmg..."
+            
+            xcrun notarytool submit "$dmg" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID" \
+              --wait
+            
+            echo "📎 Stapling $dmg..."
+            xcrun stapler staple "$dmg"
+            
+            echo "✅ $dmg notarized and stapled!"
+          done
+
+      - name: Re-upload notarized DMGs to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_TAG=${{ github.ref_name }}
+          cd dmgs
+          
+          # Delete old DMGs from release
+          for dmg in *.dmg; do
+            gh release delete-asset $RELEASE_TAG "$dmg" --yes || true
+            sleep 2
+          done
+          
+          # Upload notarized DMGs
+          gh release upload $RELEASE_TAG *.dmg --clobber
