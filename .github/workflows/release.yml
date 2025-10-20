@@ -122,12 +122,14 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download DMGs from release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           RELEASE_TAG=${{ github.ref_name }}
-          RELEASE_ID=$(gh release view $RELEASE_TAG --json id -q .id)
           
           mkdir -p dmgs
           cd dmgs
@@ -135,6 +137,7 @@ jobs:
           # Download both DMGs
           gh release download $RELEASE_TAG -p "*.dmg"
           
+          echo "📦 Downloaded files:"
           ls -lh
 
       - name: Notarize DMGs
@@ -167,11 +170,12 @@ jobs:
           RELEASE_TAG=${{ github.ref_name }}
           cd dmgs
           
-          # Delete old DMGs from release
+          echo "📤 Re-uploading notarized DMGs..."
+          
+          # Upload notarized DMGs (will replace old ones)
           for dmg in *.dmg; do
-            gh release delete-asset $RELEASE_TAG "$dmg" --yes || true
-            sleep 2
+            echo "Uploading $dmg..."
+            gh release upload $RELEASE_TAG "$dmg" --clobber
           done
           
-          # Upload notarized DMGs
-          gh release upload $RELEASE_TAG *.dmg --clobber
+          echo "✅ All DMGs re-uploaded!"
