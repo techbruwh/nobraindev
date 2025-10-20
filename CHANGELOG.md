@@ -16,6 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - 
 
+## [0.1.2] - 2025-01-20
+
+### Added
+- Code signing and notarization for macOS distribution
+- Automated GitHub Actions release workflow
+
+### Fixed
+- "Damaged app" warning on fresh macOS installations
+
 ## [0.1.1] - 2025-01-10
 
 ### Added
