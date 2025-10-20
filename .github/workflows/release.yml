@@ -99,13 +99,12 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Disable Tauri's built-in notarization - we'll do it separately
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'NoBrainDev ${{ github.ref_name }}'
           releaseBody: 'See the CHANGELOG.md for details.'
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: --target ${{ matrix.platform.rust_target }}
 
@@ -134,7 +133,7 @@ jobs:
           mkdir -p dmgs
           cd dmgs
           
-          # Download both DMGs
+          # Download both DMGs from published release
           gh release download $RELEASE_TAG -p "*.dmg"
           
           echo "📦 Downloaded files:"
@@ -172,10 +171,12 @@ jobs:
           
           echo "📤 Re-uploading notarized DMGs..."
           
-          # Upload notarized DMGs (will replace old ones)
+          # Remove old unsigned DMGs and upload notarized ones
           for dmg in *.dmg; do
-            echo "Uploading $dmg..."
-            gh release upload $RELEASE_TAG "$dmg" --clobber
+            echo "Replacing $dmg with notarized version..."
+            gh release delete-asset $RELEASE_TAG "$dmg" --yes || true
+            sleep 1
+            gh release upload $RELEASE_TAG "$dmg"
           done
           
-          echo "✅ All DMGs re-uploaded!"
+          echo "✅ All DMGs replaced with notarized versions!"
