@@ -207,10 +207,8 @@ jobs:
           
           # Remove old unsigned DMGs and upload notarized ones
           for dmg in *.dmg; do
-            echo "Replacing $dmg with notarized version..."
-            gh release delete-asset $RELEASE_TAG "$dmg" --yes || true
-            sleep 1
-            gh release upload $RELEASE_TAG "$dmg"
+            echo "Uploading $dmg..."
+            gh release upload $RELEASE_TAG "$dmg" --clobber
           done
           
           echo "✅ All DMGs replaced with notarized versions!"
