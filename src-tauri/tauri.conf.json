@@ -39,7 +39,8 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "devCsp": null
     }
   },
   "plugins": {

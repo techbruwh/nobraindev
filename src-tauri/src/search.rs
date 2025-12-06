@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use ndarray::{Array, Axis};
+use ndarray::{Array};
 use ort::session::Session;
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -9,7 +9,6 @@ use tokenizers::Tokenizer;
 use crate::models::{SearchResult, Snippet};
 
 const MODEL_NAME: &str = "all-MiniLM-L6-v2";
-const EMBEDDING_DIM: usize = 384;
 
 pub struct SearchEngine {
     session: RefCell<Session>,
@@ -111,9 +110,9 @@ impl SearchEngine {
             let mask = mask_val as f32;
             mask_sum += mask;
 
-            for j in 0..hidden_size {
+            for (j, pooled_item) in pooled.iter_mut().enumerate().take(hidden_size) {
                 let idx = i * hidden_size + j;
-                pooled[j] += embeddings[idx] * mask;
+                *pooled_item += embeddings[idx] * mask;
             }
         }
 
@@ -180,11 +179,11 @@ impl SearchEngine {
         let mut text = snippet.title.clone();
 
         if let Some(desc) = &snippet.description {
-            text.push_str(" ");
+            text.push(' ');
             text.push_str(desc);
         }
 
-        text.push_str(" ");
+        text.push(' ');
         text.push_str(&snippet.content);
 
         // Truncate if too long (BERT models usually have 512 token limit)
@@ -205,7 +204,7 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     let dot_product: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
     
     // Vectors are already normalized from mean_pooling, so dot product = cosine similarity
-    dot_product.max(-1.0).min(1.0)
+    dot_product.clamp(-1.0, 1.0)
 }
 
 pub fn get_models_dir() -> Result<PathBuf> {
@@ -280,7 +279,7 @@ async fn download_file(url: &str, dest: &PathBuf) -> Result<()> {
         // Print progress
         if total_size > 0 {
             let progress = (downloaded as f64 / total_size as f64) * 100.0;
-            if downloaded % (total_size / 10).max(1) == 0 {
+            if downloaded.is_multiple_of((total_size / 10).max(1)) {
                 println!("Download progress: {:.1}%", progress);
             }
         }

@@ -251,13 +251,5 @@ impl Database {
 
         Ok(embeddings)
     }
-
-    pub fn delete_embedding(&self, snippet_id: i64) -> Result<()> {
-        self.conn.execute(
-            "DELETE FROM embeddings WHERE snippet_id = ?1",
-            params![snippet_id],
-        )?;
-        Ok(())
-    }
 }
 
