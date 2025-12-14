@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { Plus, Search, FileCode, X, Edit, Trash2, Copy, Save, Brain, Download, Sparkles } from 'lucide-react'
+import { Plus, Search, FileCode, X, Edit, Trash2, Copy, Save, Brain, Download, Sparkles, CheckCircle, AlertCircle, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import ReactQuill from 'react-quill-new'
+import 'react-quill-new/dist/quill.snow.css'
+import './editor.css'
 
 function App() {
   const [snippets, setSnippets] = useState([])
@@ -19,12 +22,21 @@ function App() {
   const [isLoadingModel, setIsLoadingModel] = useState(false)
   const [useSemanticSearch, setUseSemanticSearch] = useState(false)
   
+  // Toast notification state
+  const [toast, setToast] = useState(null)
+  
   // Form state
   const [title, setTitle] = useState('')
   const [language, setLanguage] = useState('javascript')
   const [tags, setTags] = useState('')
   const [description, setDescription] = useState('')
   const [content, setContent] = useState('')
+
+  // Show toast notification
+  const showToast = (message, type = 'info') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
+  }
 
   // Load snippets and check model status on mount
   useEffect(() => {
@@ -65,10 +77,10 @@ function App() {
     try {
       await invoke('load_model')
       await checkModelStatus()
-      alert('AI model loaded successfully! You can now use semantic search.')
+      showToast('AI model loaded successfully! You can now use semantic search.', 'success')
     } catch (error) {
       console.error('Failed to load model:', error)
-      alert('AI Search is not available yet.\n\nThe feature requires downloading a 22MB model file, but automatic download is still being implemented.\n\nYou can continue using keyword search for now.')
+      showToast('AI Search is not available yet. The feature requires downloading a 22MB model file.', 'error')
     } finally {
       setIsLoadingModel(false)
     }
@@ -142,11 +154,11 @@ function App() {
 
   const handleSaveSnippet = async () => {
     if (!title.trim()) {
-      alert('Title is required')
+      showToast('Title is required', 'error')
       return
     }
     if (!content.trim()) {
-      alert('Content is required')
+      showToast('Content is required', 'error')
       return
     }
 
@@ -163,8 +175,10 @@ function App() {
     try {
       if (currentSnippet) {
         await invoke('update_snippet', { id: currentSnippet.id, snippet })
+        showToast('Snippet updated successfully', 'success')
       } else {
         await invoke('create_snippet', { snippet })
+        showToast('Snippet created successfully', 'success')
       }
       
       await loadSnippets()
@@ -172,7 +186,7 @@ function App() {
       setCurrentSnippet(null)
     } catch (error) {
       console.error('Failed to save snippet:', error)
-      alert('Failed to save snippet')
+      showToast('Failed to save snippet', 'error')
     }
   }
 
@@ -183,6 +197,7 @@ function App() {
 
     try {
       await invoke('delete_snippet', { id: snippet.id })
+      showToast('Snippet deleted successfully', 'success')
       await loadSnippets()
       if (currentSnippet?.id === snippet.id) {
         setCurrentSnippet(null)
@@ -190,20 +205,53 @@ function App() {
       }
     } catch (error) {
       console.error('Failed to delete snippet:', error)
-      alert('Failed to delete snippet')
+      showToast('Failed to delete snippet', 'error')
     }
   }
 
   const handleCopyCode = async (code) => {
     try {
       await navigator.clipboard.writeText(code)
+      showToast('Code copied to clipboard', 'success')
     } catch (error) {
       console.error('Failed to copy:', error)
+      showToast('Failed to copy code', 'error')
     }
   }
 
   return (
     <div className="flex h-screen bg-background">
+      {/* Toast Notification */}
+      {toast && (
+      <div 
+        className="fixed top-0 left-0 right-0 z-50 flex justify-center px-4 pt-4"
+        style={{
+          animation: 'slideDown 0.3s ease-out'
+        }}
+      >
+        <div 
+          className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border max-w-md w-full ${
+            toast.type === 'error' 
+              ? 'bg-destructive border-destructive text-destructive-foreground' 
+              : toast.type === 'success' 
+              ? 'bg-primary border-primary text-primary-foreground' 
+              : 'bg-accent border-border text-foreground'
+          }`}
+        >
+          {toast.type === 'success' && <CheckCircle className="h-5 w-5 flex-shrink-0" />}
+          {toast.type === 'error' && <AlertCircle className="h-5 w-5 flex-shrink-0" />}
+          {toast.type === 'info' && <Info className="h-5 w-5 flex-shrink-0" />}
+          <p className="text-sm font-medium flex-1">{toast.message}</p>
+          <button
+            onClick={() => setToast(null)}
+            className="flex-shrink-0 hover:opacity-70 transition-opacity"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    )}
+
       {/* Sidebar */}
       <div className="w-80 border-r flex flex-col">
         {/* Header */}
@@ -211,7 +259,7 @@ function App() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <FileCode className="h-6 w-6 text-primary" />
-              <h1 className="text-xl font-bold">SnippetVault</h1>
+              <h1 className="text-xl">Snippets</h1>
             </div>
             <Button onClick={handleNewSnippet} size="sm">
               <Plus className="h-4 w-4" />
@@ -282,20 +330,7 @@ function App() {
 
         {/* Snippets List */}
         <div className="flex-1 overflow-y-auto p-2">
-          {filteredSnippets.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center p-4">
-              <FileCode className="h-12 w-12 text-muted-foreground mb-2" />
-              <h2 className="text-lg font-semibold">No snippets yet</h2>
-              <p className="text-sm text-muted-foreground mb-4">
-                Create your first code snippet
-              </p>
-              <Button onClick={handleNewSnippet} size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                New Snippet
-              </Button>
-            </div>
-          ) : (
-            filteredSnippets.map((snippet) => (
+          {filteredSnippets.map((snippet) => (
               <Card
                 key={snippet.id}
                 className={`mb-2 cursor-pointer transition-colors ${
@@ -325,8 +360,7 @@ function App() {
                   </p>
                 </CardContent>
               </Card>
-            ))
-          )}
+            ))}
         </div>
       </div>
 
@@ -368,7 +402,7 @@ function App() {
             <div className="space-y-4">
               <div>
                 <Input
-                  placeholder="Snippet title..."
+                  placeholder="Title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   className="text-lg font-semibold"
@@ -401,6 +435,7 @@ function App() {
                     <option value="json">JSON</option>
                     <option value="yaml">YAML</option>
                     <option value="markdown">Markdown</option>
+                    <option value="others">Others</option>
                   </select>
                 </div>
                 <div className="flex-1">
@@ -417,17 +452,28 @@ function App() {
                   placeholder="Description (optional)..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  rows={2}
+                  rows={1}
                 />
               </div>
 
               <div className="flex-1">
-                <Textarea
-                  placeholder="Paste your code here..."
+                <ReactQuill
+                  theme="snow"
                   value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  rows={20}
-                  className="font-mono text-sm"
+                  onChange={setContent}
+                  placeholder="Paste your code here..."
+                  className="h-[500px] mb-12"
+                  modules={{
+                    toolbar: [
+                      [{ 'header': [1, 2, 3, false] }],
+                      ['bold', 'italic', 'underline', 'strike'],
+                      ['blockquote', 'code-block'],
+                      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                      [{ 'color': [] }, { 'background': [] }],
+                      ['link'],
+                      ['clean']
+                    ]
+                  }}
                 />
               </div>
             </div>
@@ -479,11 +525,24 @@ function App() {
             )}
 
             <div className="flex-1 bg-muted rounded-lg p-4 overflow-auto">
-              <pre className="text-sm font-mono whitespace-pre-wrap">{currentSnippet.content}</pre>
+              <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: currentSnippet.content }} />
             </div>
           </div>
         )}
       </div>
+
+      <style>{`
+        @keyframes slideDown {
+          from {
+            transform: translateY(-100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+      `}</style>
     </div>
   )
 }
