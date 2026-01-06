@@ -82,3 +82,53 @@
   color: hsl(var(--primary));
   text-decoration: underline;
 }
+
+/* Better prose styling for view mode */
+.prose {
+  color: hsl(var(--foreground));
+}
+
+.prose pre {
+  background-color: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  border-radius: 0.5rem;
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+.prose code {
+  background-color: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+}
+
+.prose a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+}
+
+.prose strong {
+  color: hsl(var(--foreground));
+  font-weight: 600;
+}
+
+.prose blockquote {
+  border-left: 2px solid hsl(var(--primary));
+  padding-left: 1rem;
+  font-style: italic;
+  color: hsl(var(--muted-foreground));
+}
+
+.dark .prose {
+  color: hsl(var(--foreground));
+}
+
+.dark .prose pre {
+  background-color: hsl(var(--muted));
+}
+
+.dark .prose code {
+  background-color: hsl(var(--muted));
+}
