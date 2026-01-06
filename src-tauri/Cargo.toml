@@ -1,6 +1,6 @@
 [package]
 name = "nobraindev"
-version = "0.1.2"
+version = "v0.1.3"
 description = "NoBrainDev - AI-powered code snippet manager with semantic search"
 authors = ["TechBruwh"]
 license = "MIT"
