@@ -1,14 +1,9 @@
 import { Search, Sparkles, Brain, Download, Loader2, X, Star } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { open } from '@tauri-apps/plugin-shell'
 
 export function SearchBar({ 
   onSearchClick, 
   useSemanticSearch, 
-  modelStatus,
-  isLoadingModel,
-  onLoadModel,
   isMac,
   searchQuery,
   isSearchOpen,
