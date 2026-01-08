@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [1.0.0] - 2026-01-09
 
+### ✨ Features
+-  add account sync
+
+
+
+## [1.0.0] - 2026-01-09
+
 
 
 ## [0.2.8] - 2026-01-08
