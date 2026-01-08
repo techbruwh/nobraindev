@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.3] - 2026-01-09
+
+### ✨ Features
+-  make snippets autofocus when selected by search
+-  add sync to footer and memory optimizing
+
+
+
 ## [1.0.2] - 2026-01-09
 
 ### 🐛 Bug Fixes
