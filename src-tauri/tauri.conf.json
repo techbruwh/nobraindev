@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "NoBrainDev",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "identifier": "com.techbruwh.nobraindev",
   "build": {
     "devUrl": "http://localhost:1420",
@@ -17,7 +17,8 @@
       "icons/web/favicon.ico"
     ],
     "macOS": {
-      "minimumSystemVersion": "10.13"
+      "minimumSystemVersion": "10.13",
+      "bundleName": "NoBrainDev"
     },
     "windows": {
       "certificateThumbprint": null,
@@ -31,7 +32,7 @@
       {
         "fullscreen": false,
         "resizable": true,
-        "title": "",
+        "title": "NoBrainDev",
         "width": 1200,
         "height": 800,
         "minWidth": 800,
