@@ -4,10 +4,10 @@ import { Plus, Search, FileCode, X, Edit, Trash2, Copy, Save, Brain, Download, S
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { SearchBar } from '@/components/ui/searchbar'
 import { SearchModal } from '@/components/ui/searchmodal'
+import { ConfirmDialog } from '@/components/ui/confirmdialog'
 import ReactQuill from 'react-quill-new'
 import 'react-quill-new/dist/quill.snow.css'
 import './editor.css'
@@ -43,6 +43,14 @@ function App() {
   const [tags, setTags] = useState('')
   const [description, setDescription] = useState('')
   const [content, setContent] = useState('')
+
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  })
 
   // Detect OS
   useEffect(() => {
@@ -286,22 +294,25 @@ function App() {
   }
 
   const handleDeleteSnippet = async (snippet) => {
-    if (!confirm(`Are you sure you want to delete "${snippet.title}"?`)) {
-      return
-    }
-
-    try {
-      await invoke('delete_snippet', { id: snippet.id })
-      showToast('Snippet deleted successfully', 'success')
-      await loadSnippets()
-      if (currentSnippet?.id === snippet.id) {
-        setCurrentSnippet(null)
-        setIsEditing(false)
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Snippet',
+      message: `Are you sure you want to delete "${snippet.title}"? This action cannot be undone.`,
+      onConfirm: async () => {
+        try {
+          await invoke('delete_snippet', { id: snippet.id })
+          showToast('Snippet deleted successfully', 'success')
+          await loadSnippets()
+          if (currentSnippet?.id === snippet.id) {
+            setCurrentSnippet(null)
+            setIsEditing(false)
+          }
+        } catch (error) {
+          console.error('Failed to delete snippet:', error)
+          showToast('Failed to delete snippet', 'error')
+        }
       }
-    } catch (error) {
-      console.error('Failed to delete snippet:', error)
-      showToast('Failed to delete snippet', 'error')
-    }
+    })
   }
 
   const handleCopyCode = async (code) => {
@@ -679,6 +690,18 @@ function App() {
           </a>
         </p>
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
+      />
 
       <style>{`
         @keyframes slideDown {

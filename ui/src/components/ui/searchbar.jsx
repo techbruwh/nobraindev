@@ -1,5 +1,7 @@
-import { Search, Sparkles, Brain, Download, Loader2, X, Star } from 'lucide-react'
+import { Search, Sparkles, X, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirmdialog'
+import { useState } from 'react'
 
 export function SearchBar({ 
   onSearchClick, 
@@ -9,6 +11,7 @@ export function SearchBar({
   isSearchOpen,
   onClearSearch
 }) {
+  const [showGitHubDialog, setShowGitHubDialog] = useState(false)
   return (
     <div className="h-10 bg-background border-b flex items-center justify-between px-4 relative overflow-hidden">
       {/* Gradient background overlay for AI branding */}
@@ -71,11 +74,25 @@ export function SearchBar({
         variant="outline" 
         size="sm" 
         className="gap-1 shrink-0 z-10"
-        onClick={() => open('https://github.com/techbruwh/nobraindev')}
+        onClick={() => setShowGitHubDialog(true)}
       >
         <Star className="h-3 w-3" />
         <span className="hidden sm:inline">Star on GitHub</span>
       </Button>
+
+      <ConfirmDialog
+        isOpen={showGitHubDialog}
+        onClose={() => setShowGitHubDialog(false)}
+        onConfirm={() => {
+          navigator.clipboard.writeText('https://github.com/techbruwh/nobraindev')
+          setShowGitHubDialog(false)
+        }}
+        title="Star on GitHub"
+        message="Please copy this URL and paste it in your browser: https://github.com/techbruwh/nobraindev"
+        confirmText="Copy URL"
+        cancelText="Close"
+        variant="default"
+      />
     </div>
   )
 }
