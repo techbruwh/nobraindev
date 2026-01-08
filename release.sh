@@ -40,6 +40,16 @@ if [ -n "$(git status --porcelain)" ]; then
     fi
 fi
 
+# Get the last tag to determine commit range
+LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+if [ -z "$LAST_TAG" ]; then
+    echo -e "${YELLOW}ℹ️  No previous tags found. Using all commits.${NC}"
+    COMMIT_RANGE=""
+else
+    echo -e "${BLUE}📊 Generating changelog since $LAST_TAG${NC}"
+    COMMIT_RANGE="$LAST_TAG..HEAD"
+fi
+
 # Update version in Cargo.toml
 echo -e "${BLUE}📝 Updating src-tauri/Cargo.toml...${NC}"
 sed -i.bak "s/^version = \".*\"/version = \"$NEW_VERSION\"/" src-tauri/Cargo.toml && rm src-tauri/Cargo.toml.bak
@@ -54,33 +64,101 @@ else
     sed -i "s/\"version\": \".*\"/\"version\": \"$NEW_VERSION\"/" src-tauri/tauri.conf.json
 fi
 
+# Update version badge in README.md
+echo -e "${BLUE}📝 Updating README.md...${NC}"
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS
+    sed -i '' "s/badge\/version-[0-9.]*-blue/badge\/version-$NEW_VERSION-blue/" README.md
+else
+    # Linux/WSL
+    sed -i "s/badge\/version-[0-9.]*-blue/badge\/version-$NEW_VERSION-blue/" README.md
+fi
+
 echo ""
 echo -e "${GREEN}✅ Version updated to $NEW_VERSION${NC}"
 echo ""
 
-# Create CHANGELOG entry if it doesn't exist
-if [ ! -f CHANGELOG.md ]; then
+# Generate changelog entries from git commits
+echo -e "${BLUE}📝 Generating CHANGELOG.md entries...${NC}"
+
+# Extract commits by type
+if [ -n "$COMMIT_RANGE" ]; then
+    FEAT_COMMITS=$(git log $COMMIT_RANGE --pretty=format:"%s" --grep="^feat" --grep="^feat(" || echo "")
+    FIX_COMMITS=$(git log $COMMIT_RANGE --pretty=format:"%s" --grep="^fix" --grep="^fix(" || echo "")
+    REFACTOR_COMMITS=$(git log $COMMIT_RANGE --pretty=format:"%s" --grep="^refactor" --grep="^refactor(" || echo "")
+    CHORE_COMMITS=$(git log $COMMIT_RANGE --pretty=format:"%s" --grep="^chore" --grep="^chore(" || echo "")
+else
+    FEAT_COMMITS=$(git log --pretty=format:"%s" --grep="^feat" --grep="^feat(" || echo "")
+    FIX_COMMITS=$(git log --pretty=format:"%s" --grep="^fix" --grep="^fix(" || echo "")
+    REFACTOR_COMMITS=$(git log --pretty=format:"%s" --grep="^refactor" --grep="^refactor(" || echo "")
+    CHORE_COMMITS=$(git log --pretty=format:"%s" --grep="^chore" --grep="^chore(" || echo "")
+fi
+
+# Prepare changelog content
+CHANGELOG_CONTENT="## [$NEW_VERSION] - $(date +%Y-%m-%d)\n\n"
+
+# Add features
+if [ -n "$FEAT_COMMITS" ]; then
+    CHANGELOG_CONTENT+="### ✨ Features\n"
+    while IFS= read -r commit; do
+        # Remove "feat: " or "feat(scope): " prefix
+        msg=$(echo "$commit" | sed -E 's/^feat(\([^)]*\))?:\s*//')
+        CHANGELOG_CONTENT+="- $msg\n"
+    done <<< "$FEAT_COMMITS"
+    CHANGELOG_CONTENT+="\n"
+fi
+
+# Add fixes
+if [ -n "$FIX_COMMITS" ]; then
+    CHANGELOG_CONTENT+="### 🐛 Bug Fixes\n"
+    while IFS= read -r commit; do
+        msg=$(echo "$commit" | sed -E 's/^fix(\([^)]*\))?:\s*//')
+        CHANGELOG_CONTENT+="- $msg\n"
+    done <<< "$FIX_COMMITS"
+    CHANGELOG_CONTENT+="\n"
+fi
+
+# Add refactors
+if [ -n "$REFACTOR_COMMITS" ]; then
+    CHANGELOG_CONTENT+="### ♻️ Refactoring\n"
+    while IFS= read -r commit; do
+        msg=$(echo "$commit" | sed -E 's/^refactor(\([^)]*\))?:\s*//')
+        CHANGELOG_CONTENT+="- $msg\n"
+    done <<< "$REFACTOR_COMMITS"
+    CHANGELOG_CONTENT+="\n"
+fi
+
+# Add chores
+if [ -n "$CHORE_COMMITS" ]; then
+    CHANGELOG_CONTENT+="### 🔧 Chores\n"
+    while IFS= read -r commit; do
+        msg=$(echo "$commit" | sed -E 's/^chore(\([^)]*\))?:\s*//')
+        CHANGELOG_CONTENT+="- $msg\n"
+    done <<< "$CHORE_COMMITS"
+    CHANGELOG_CONTENT+="\n"
+fi
+
+# Update or create CHANGELOG.md
+if [ -f CHANGELOG.md ]; then
+    echo -e "${BLUE}📝 Updating CHANGELOG.md...${NC}"
+    # Create temp file with new content
+    echo -e "# Changelog\n" > CHANGELOG.tmp
+    echo -e "All notable changes to this project will be documented in this file.\n" >> CHANGELOG.tmp
+    echo -e "$CHANGELOG_CONTENT" >> CHANGELOG.tmp
+    # Append old content (skip first 3 lines which are header)
+    tail -n +4 CHANGELOG.md >> CHANGELOG.tmp 2>/dev/null || true
+    mv CHANGELOG.tmp CHANGELOG.md
+    echo -e "${GREEN}✅ CHANGELOG.md updated${NC}"
+else
     echo -e "${BLUE}📝 Creating CHANGELOG.md...${NC}"
     cat > CHANGELOG.md << EOF
 # Changelog
 
 All notable changes to this project will be documented in this file.
 
-## [$NEW_VERSION] - $(date +%Y-%m-%d)
-
-### Added
-- Initial release
-
-### Changed
-- 
-
-### Fixed
-- 
-
+$(echo -e "$CHANGELOG_CONTENT")
 EOF
     echo -e "${GREEN}✅ CHANGELOG.md created${NC}"
-else
-    echo -e "${YELLOW}ℹ️  CHANGELOG.md already exists. Please update it manually.${NC}"
 fi
 
 echo ""
@@ -89,7 +167,7 @@ echo ""
 
 # Add all changes
 echo -e "${BLUE}📦 Adding files...${NC}"
-git add src-tauri/Cargo.toml src-tauri/tauri.conf.json CHANGELOG.md
+git add src-tauri/Cargo.toml src-tauri/tauri.conf.json README.md CHANGELOG.md
 
 # Show what will be committed
 echo -e "${BLUE}📋 Changes to commit:${NC}"
