@@ -20,5 +20,16 @@ export default defineConfig({
     target: ['es2021', 'chrome100', 'safari13'],
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
     sourcemap: !!process.env.TAURI_DEBUG,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          'editor': ['react-quill-new'],
+          'auth': ['@clerk/clerk-react'],
+          'supabase': ['@supabase/supabase-js']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 600,
   },
 })

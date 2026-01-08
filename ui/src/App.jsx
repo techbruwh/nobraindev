@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { Plus, Search, FileCode, X, Edit, Trash2, Copy, Save, Brain, Download, Sparkles, CheckCircle, AlertCircle, Info, PanelLeftClose, PanelLeft, Keyboard, Code, Braces } from 'lucide-react'
+import { Plus, Search, FileCode, X, Edit, Trash2, Copy, Save, Brain, Download, Sparkles, CheckCircle, AlertCircle, Info, PanelLeftClose, PanelLeft, Keyboard, Code, Braces, RefreshCw, Cloud } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -11,7 +11,7 @@ import { ConfirmDialog } from '@/components/ui/confirmdialog'
 import { MenuSidebar } from '@/components/ui/menusidebar'
 import { SnippetsPanel } from '@/components/ui/snippetspanel'
 import { AccountPanel } from '@/components/ui/accountpanel'
-import ReactQuill from 'react-quill-new'
+const ReactQuill = lazy(() => import('react-quill-new'))
 import 'react-quill-new/dist/quill.snow.css'
 import './editor.css'
 
@@ -66,6 +66,11 @@ function App() {
 
   // Menu sidebar state
   const [activeMenu, setActiveMenu] = useState('snippets')
+
+  // Track if snippets have been modified
+  const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(false)
+  const [lastSyncTime, setLastSyncTime] = useState(null)
+  const [isSyncingFromFooter, setIsSyncingFromFooter] = useState(false)
 
   // Detect OS
   useEffect(() => {
@@ -488,6 +493,9 @@ function App() {
         showToast('Snippet created successfully', 'success')
       }
       
+      // Mark as having unsynced changes
+      setHasUnsyncedChanges(true)
+      
       await loadSnippets()
       setIsEditing(false)
       
@@ -518,6 +526,10 @@ function App() {
         try {
           await invoke('delete_snippet', { id: snippet.id })
           showToast('Snippet deleted successfully', 'success')
+          
+          // Mark as having unsynced changes
+          setHasUnsyncedChanges(true)
+          
           await loadSnippets()
           if (currentSnippet?.id === snippet.id) {
             setCurrentSnippet(null)
@@ -637,7 +649,20 @@ function App() {
             />
           )}
           
-          {activeMenu === 'account' && <AccountPanel />}
+          {activeMenu === 'account' && (
+            <AccountPanel 
+              hasUnsyncedChanges={hasUnsyncedChanges}
+              lastSyncTime={lastSyncTime}
+              onSyncComplete={(syncTime) => {
+                setHasUnsyncedChanges(false)
+                setLastSyncTime(syncTime)
+                setIsSyncingFromFooter(false)
+              }}
+              onSyncStart={() => {
+                // Optionally handle sync start
+              }}
+            />
+          )}
         </div>
 
         {/* Resize Handle */}
@@ -762,24 +787,26 @@ function App() {
                     className="resize-none"
                   />
 
-                  <ReactQuill
-                    ref={quillRef}
-                    theme="snow"
-                    value={content}
-                    onChange={setContent}
-                    placeholder="Paste your code here..."
-                    className="h-[calc(100vh-320px)]"
-                    modules={{
-                      toolbar: [
-                        [{ 'header': [1, 2, 3, false] }],
-                        ['bold', 'italic', 'underline', 'code'],
-                        ['blockquote', 'code-block'],
-                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                        ['link'],
-                        ['clean']
-                      ]
-                    }}
-                  />
+                  <Suspense fallback={<div className="flex items-center justify-center h-32 text-xs text-muted-foreground">Loading editor...</div>}>
+                    <ReactQuill
+                      ref={quillRef}
+                      theme="snow"
+                      value={content}
+                      onChange={setContent}
+                      placeholder="Paste your code here..."
+                      className="h-[calc(100vh-320px)]"
+                      modules={{
+                        toolbar: [
+                          [{ 'header': [1, 2, 3, false] }],
+                          ['bold', 'italic', 'underline', 'code'],
+                          ['blockquote', 'code-block'],
+                          [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                          ['link'],
+                          ['clean']
+                        ]
+                      }}
+                    />
+                  </Suspense>
                 </div>
               </div>
             </div>
@@ -850,7 +877,7 @@ function App() {
       </div>
 
       {/* Footer */}
-      <div className="border-t bg-background px-4 py-1.5 flex items-center justify-center">
+      <div className="border-t bg-background px-4 py-1.5 flex items-center justify-between">
         <p className="text-[10px] text-muted-foreground flex items-center gap-1">
           made with <span className="text-red-500">♥</span> by{' '}
           <a 
@@ -862,6 +889,30 @@ function App() {
             techbruwh
           </a>
         </p>
+        
+        <div className="flex items-center gap-2">
+          {lastSyncTime && (
+            <span className="text-[9px] text-muted-foreground flex items-center gap-1">
+              <Cloud className="h-3 w-3" />
+              Last synced: {lastSyncTime.toLocaleTimeString()}
+            </span>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-[10px] gap-1"
+            disabled={!hasUnsyncedChanges || isSyncingFromFooter}
+            onClick={() => {
+              setIsSyncingFromFooter(true)
+              // Trigger sync from footer
+              const event = new CustomEvent('footer-sync-clicked')
+              window.dispatchEvent(event)
+            }}
+          >
+            <RefreshCw className={`h-3 w-3 ${isSyncingFromFooter ? 'animate-spin' : ''}`} />
+            {isSyncingFromFooter ? 'Syncing...' : hasUnsyncedChanges ? 'Sync Now' : 'All Synced'}
+          </Button>
+        </div>
       </div>
 
       {/* Keyboard Shortcuts Help Modal */}

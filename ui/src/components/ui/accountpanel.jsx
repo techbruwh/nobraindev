@@ -7,14 +7,21 @@ import { authService } from '@/lib/auth'
 import { syncService } from '@/lib/sync'
 import { isClerkConfigured } from '@/lib/clerk'
 
-export function AccountPanel() {
+export function AccountPanel({ 
+  hasUnsyncedChanges, 
+  onSyncComplete, 
+  onSyncStart,
+  lastSyncTime: externalLastSyncTime 
+}) {
   const { isSignedIn, user: clerkUser } = useUser()
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncStatus, setSyncStatus] = useState(null)
   const [error, setError] = useState(null)
-  const [lastSyncTime, setLastSyncTime] = useState(null)
+  const [localLastSyncTime, setLocalLastSyncTime] = useState(null)
   const [syncApproval, setSyncApproval] = useState(null)
   const [checkingApproval, setCheckingApproval] = useState(false)
+  
+  const lastSyncTime = externalLastSyncTime || localLastSyncTime
 
   // Sync Clerk user with auth service
   useEffect(() => {
@@ -66,9 +73,19 @@ export function AccountPanel() {
       return
     }
 
+    // If no unsynced changes, show message without calling API
+    if (!hasUnsyncedChanges) {
+      setSyncStatus({
+        type: 'success',
+        message: '✓ Everything is up to date'
+      })
+      return
+    }
+
     setIsSyncing(true)
     setError(null)
     setSyncStatus(null)
+    onSyncStart?.()
 
     try {
       const result = await syncService.syncAll(email)
@@ -90,7 +107,10 @@ export function AccountPanel() {
         message,
         ...result
       })
-      setLastSyncTime(result.syncTime)
+      setLocalLastSyncTime(result.syncTime)
+      
+      // Notify parent that sync completed successfully
+      onSyncComplete?.(result.syncTime)
     } catch (error) {
       console.error('Sync failed:', error)
       
@@ -106,6 +126,18 @@ export function AccountPanel() {
       setIsSyncing(false)
     }
   }
+  
+  // Listen for footer sync clicks
+  useEffect(() => {
+    const handleFooterSync = () => {
+      if (isSignedIn && syncApproval?.approved) {
+        handleSync()
+      }
+    }
+    
+    window.addEventListener('footer-sync-clicked', handleFooterSync)
+    return () => window.removeEventListener('footer-sync-clicked', handleFooterSync)
+  }, [isSignedIn, syncApproval, hasUnsyncedChanges, clerkUser])
 
   return (
     <div className="h-full flex flex-col">
@@ -257,14 +289,16 @@ export function AccountPanel() {
                 // Approved - show sync button
                 <>
                   <Button 
-                    variant="default" 
+                    variant={hasUnsyncedChanges ? "default" : "secondary"}
                     className="w-full justify-start gap-2" 
                     size="sm"
                     onClick={handleSync}
-                    disabled={isSyncing}
+                    disabled={isSyncing || !hasUnsyncedChanges}
                   >
                     <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                    <span className="text-xs">{isSyncing ? 'Syncing...' : 'Sync Now'}</span>
+                    <span className="text-xs">
+                      {isSyncing ? 'Syncing...' : hasUnsyncedChanges ? 'Sync Now' : 'All Synced'}
+                    </span>
                   </Button>
 
                   {lastSyncTime && (
