@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { Plus, Search, FileCode, X, Edit, Trash2, Copy, Save, Brain, Download, Sparkles, CheckCircle, AlertCircle, Info, PanelLeftClose, PanelLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -43,6 +43,9 @@ function App() {
   const [tags, setTags] = useState('')
   const [description, setDescription] = useState('')
   const [content, setContent] = useState('')
+  
+  // Quill editor ref
+  const quillRef = useRef(null)
 
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState({
@@ -110,6 +113,50 @@ function App() {
       document.removeEventListener('mouseup', handleMouseUp)
     }
   }, [isResizing])
+
+  // Setup Quill tab handler
+  useEffect(() => {
+    if (quillRef.current && isEditing) {
+      const quill = quillRef.current.getEditor()
+      
+      // Override tab key behavior
+      const handleTab = (e) => {
+        if (e.key === 'Tab' && !e.shiftKey) {
+          const selection = quill.getSelection()
+          if (selection) {
+            const format = quill.getFormat(selection.index)
+            if (format['code-block']) {
+              e.preventDefault()
+              e.stopPropagation()
+              
+              // Get the current line
+              const [line] = quill.getLine(selection.index)
+              
+              // Insert HTML with non-breaking spaces directly
+              const range = quill.getSelection()
+              const delta = quill.clipboard.convert({ html: '&nbsp;&nbsp;' })
+              quill.updateContents(
+                new (quill.constructor.import('delta'))()
+                  .retain(range.index)
+                  .concat(delta),
+                'user'
+              )
+              quill.setSelection(range.index + 2, 0)
+              
+              return false
+            }
+          }
+        }
+      }
+      
+      const editorElement = quill.root
+      editorElement.addEventListener('keydown', handleTab, { capture: true })
+      
+      return () => {
+        editorElement.removeEventListener('keydown', handleTab, { capture: true })
+      }
+    }
+  }, [isEditing])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -588,25 +635,24 @@ function App() {
                     className="resize-none"
                   />
 
-                  <div className="border rounded-md overflow-hidden">
-                    <ReactQuill
-                      theme="snow"
-                      value={content}
-                      onChange={setContent}
-                      placeholder="Paste your code here..."
-                      className="h-[calc(100vh-320px)]"
-                      modules={{
-                        toolbar: [
-                          [{ 'header': [1, 2, 3, false] }],
-                          ['bold', 'italic', 'underline', 'code'],
-                          ['blockquote', 'code-block'],
-                          [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                          ['link'],
-                          ['clean']
-                        ]
-                      }}
-                    />
-                  </div>
+                  <ReactQuill
+                    ref={quillRef}
+                    theme="snow"
+                    value={content}
+                    onChange={setContent}
+                    placeholder="Paste your code here..."
+                    className="h-[calc(100vh-320px)]"
+                    modules={{
+                      toolbar: [
+                        [{ 'header': [1, 2, 3, false] }],
+                        ['bold', 'italic', 'underline', 'code'],
+                        ['blockquote', 'code-block'],
+                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                        ['link'],
+                        ['clean']
+                      ]
+                    }}
+                  />
                 </div>
               </div>
             </div>

@@ -8,6 +8,7 @@
 .ql-toolbar {
   background: hsl(var(--muted));
   border: 1px solid hsl(var(--border)) !important;
+  border-bottom: 1px solid hsl(var(--border)) !important;
   border-radius: 0.5rem 0.5rem 0 0;
   padding: 0.25rem 0.5rem;
   min-height: auto;
@@ -130,18 +131,46 @@
 .ql-snow .ql-editor pre.ql-syntax,
 .ql-snow .ql-editor pre,
 .ql-editor pre.ql-syntax,
-.ql-editor pre {
-  background: linear-gradient(135deg, hsl(var(--muted)) 0%, hsl(var(--muted)/0.8) 100%) !important;
-  color: hsl(var(--foreground)) !important;
-  border: 1px solid hsl(var(--border)) !important;
-  border-left: 3px solid hsl(var(--primary)) !important;
+.ql-editor pre,
+.ql-editor .ql-code-block-container,
+.ql-snow .ql-editor .ql-code-block-container {
+  background: linear-gradient(to right, #fef9e7 0%, #fef3c7 100%) !important;
+  color: #334155 !important;
+  border: 1px solid #fbbf24 !important;
   border-radius: 0.5rem !important;
   padding: 1rem !important;
-  margin: 0.5rem 0 !important;
+  margin: 0.75rem 0 !important;
   overflow-x: auto;
   font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Monaco, Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace !important;
-  line-height: 1.6 !important;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+  line-height: 1.8 !important;
+  font-size: 0.6875rem !important;
+  box-shadow: none !important;
+  transition: all 0.2s ease !important;
+}
+
+.ql-editor .ql-code-block-container:hover,
+.ql-snow .ql-editor .ql-code-block-container:hover {
+  background: linear-gradient(to right, #fef3c7 0%, #fde68a 100%) !important;
+  border-color: #f59e0b !important;
+}
+
+/* Individual code block lines */
+.ql-editor .ql-code-block,
+.ql-snow .ql-editor .ql-code-block {
+  background: transparent !important;
+  color: #334155 !important;
+  font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Monaco, Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  line-height: 1.8 !important;
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  tab-size: 2 !important;
+}
+
+/* Make zero-width spaces invisible but preserve layout */
+.ql-editor .ql-code-block::first-line {
+  text-indent: 0;
 }
 
 /* Link styling */
@@ -193,36 +222,36 @@
 
 .ql-snow-content pre.ql-syntax,
 .ql-snow-content pre,
-.ql-editor pre.ql-syntax,
-.ql-editor pre {
-  background: linear-gradient(135deg, hsl(var(--muted)) 0%, hsl(var(--muted)/0.8) 100%) !important;
-  color: hsl(var(--foreground)) !important;
-  border: 1px solid hsl(var(--border)) !important;
-  border-left: 3px solid hsl(var(--primary)) !important;
+.ql-snow-content .ql-code-block-container {
+  background: linear-gradient(to right, #fef9e7 0%, #fef3c7 100%) !important;
+  color: #334155 !important;
+  border: 1px solid #fbbf24 !important;
   border-radius: 0.5rem !important;
   padding: 1rem !important;
   overflow-x: auto;
   margin: 0.75rem 0 !important;
-  font-size: 0.75rem !important;
+  font-size: 0.6875rem !important;
   font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Monaco, Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace !important;
-  line-height: 1.6 !important;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+  line-height: 1.8 !important;
+  box-shadow: none !important;
   position: relative;
 }
 
-.ql-snow-content pre.ql-syntax::before,
-.ql-snow-content pre::before,
-.ql-editor pre.ql-syntax::before,
-.ql-editor pre::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, hsl(var(--primary)) 0%, transparent 100%);
-  border-radius: 0.5rem 0.5rem 0 0;
+/* Individual code block lines in view mode */
+.ql-snow-content .ql-code-block {
+  background: transparent !important;
+  color: #334155 !important;
+  font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Monaco, Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  line-height: 1.8 !important;
+  white-space: pre !important;
+  word-wrap: normal !important;
+  display: block !important;
+  tab-size: 2 !important;
 }
+
+/* Removed decorative top line for cleaner look */
 
 .ql-snow-content code,
 .ql-editor code,
@@ -296,35 +325,41 @@
   margin-bottom: 0.25rem;
 }
 
-/* CRITICAL: Force code block styling - highest priority */
-pre[class*="ql"],
-pre.ql-syntax,
-.ql-editor pre,
-.ql-snow-content pre,
-div[class*="ql-editor"] pre,
-div[class*="ql-snow-content"] pre {
-  background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%) !important;
-  color: #d4d4d4 !important;
-  border: 1px solid #404040 !important;
-  border-left: 3px solid #3b82f6 !important;
+/* CRITICAL: Universal code block container styling */
+.ql-code-block-container,
+div.ql-code-block-container,
+.ql-snow-content .ql-code-block-container,
+.ql-editor .ql-code-block-container {
+  background: linear-gradient(to right, #fef9e7 0%, #fef3c7 100%) !important;
+  color: #334155 !important;
+  border: 1px solid #fbbf24 !important;
   border-radius: 0.5rem !important;
   padding: 1rem !important;
   margin: 0.75rem 0 !important;
   overflow-x: auto !important;
-  font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Consolas', 'Monaco', monospace !important;
-  font-size: 0.875rem !important;
-  line-height: 1.6 !important;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3) !important;
+  font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Monaco, Menlo, Consolas, monospace !important;
+  font-size: 0.6875rem !important;
+  line-height: 1.8 !important;
+  box-shadow: none !important;
+  position: relative;
 }
 
-/* Inline code styling */
-code:not(pre code) {
-  background-color: #2d2d2d !important;
-  color: #3b82f6 !important;
-  padding: 0.125rem 0.375rem !important;
-  border-radius: 0.25rem !important;
-  font-size: 0.875em !important;
-  font-weight: 500 !important;
-  border: 1px solid #404040 !important;
-  font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Consolas', monospace !important;
+/* Code block lines inside container */
+.ql-code-block,
+div.ql-code-block,
+.ql-snow-content .ql-code-block,
+.ql-editor .ql-code-block {
+  background: transparent !important;
+  color: #334155 !important;
+  font-family: inherit !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  line-height: 1.8 !important;
+  white-space: pre !important;
+  word-wrap: normal !important;
+  display: block !important;
+  tab-size: 2 !important;
 }
+
+/* Removed decorative accent line for minimal clean look */
