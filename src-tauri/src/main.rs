@@ -5,6 +5,7 @@ mod database;
 mod models;
 mod commands;
 mod search;
+mod auth;
 
 use std::sync::Mutex;
 
@@ -36,6 +37,11 @@ fn main() {
             commands::get_model_status,
             commands::load_model,
             commands::regenerate_embeddings,
+            auth::store_user_token,
+            auth::get_user_token,
+            auth::clear_user_tokens,
+            auth::is_authenticated,
+            auth::get_user_email,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
