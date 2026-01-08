@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { Plus, Search, FileCode, X, Edit, Trash2, Copy, Save, Brain, Download, Sparkles, CheckCircle, AlertCircle, Info, PanelLeftClose, PanelLeft } from 'lucide-react'
+import { Plus, Search, FileCode, X, Edit, Trash2, Copy, Save, Brain, Download, Sparkles, CheckCircle, AlertCircle, Info, PanelLeftClose, PanelLeft, Keyboard, Code, Braces } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -46,6 +46,9 @@ function App() {
   
   // Quill editor ref
   const quillRef = useRef(null)
+  
+  // Ref to store the save function
+  const saveSnippetRef = useRef(null)
 
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState({
@@ -54,6 +57,9 @@ function App() {
     message: '',
     onConfirm: () => {}
   })
+
+  // Shortcuts help modal state
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false)
 
   // Detect OS
   useEffect(() => {
@@ -119,6 +125,29 @@ function App() {
     if (quillRef.current && isEditing && currentSnippet) {
       const quill = quillRef.current.getEditor()
       
+      // CUSTOMIZE TOOLBAR ICONS - Add this section
+      const toolbar = quill.getModule('toolbar')
+      if (toolbar && toolbar.container) {
+        // Find and customize the inline code button
+        const codeButton = toolbar.container.querySelector('button.ql-code')
+        if (codeButton) {
+          codeButton.innerHTML = '<span style="font-family: monospace; font-weight: bold; font-size: 12px; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">&lt;&gt;</span>'
+          codeButton.setAttribute('title', 'Inline Code')
+          codeButton.style.display = 'flex'
+          codeButton.style.alignItems = 'center'
+          codeButton.style.justifyContent = 'center'
+        }
+
+        // Find and customize the code-block button
+        const codeBlockButton = toolbar.container.querySelector('button.ql-code-block')
+        if (codeBlockButton) {
+          codeBlockButton.innerHTML = '<span style="font-family: monospace; font-weight: bold; font-size: 12px; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; letter-spacing: 1px;">{}</span>'
+          codeBlockButton.setAttribute('title', 'Code Block')
+          codeBlockButton.style.display = 'flex'
+          codeBlockButton.style.alignItems = 'center'
+          codeBlockButton.style.justifyContent = 'center'
+        }
+      }
       // Fix spaces in code blocks after content loads by directly manipulating the DOM
       const fixSpaces = () => {
         // Parse the original content to find spaces
@@ -186,6 +215,11 @@ function App() {
     }
   }, [isEditing, content])
 
+  // Keep the save function ref updated
+  useEffect(() => {
+    saveSnippetRef.current = handleSaveSnippet
+  }, [title, content, language, tags, description, currentSnippet])
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -193,31 +227,111 @@ function App() {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
         setIsSearchModalOpen(true)
+        return
       }
       // Cmd/Ctrl + N for new snippet
       if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
         e.preventDefault()
         handleNewSnippet()
+        return
       }
       // Cmd/Ctrl + S for save (when editing)
-      if ((e.metaKey || e.ctrlKey) && e.key === 's' && isEditing) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault()
-        handleSaveSnippet()
+        e.stopPropagation()
+        console.log('Save shortcut triggered, isEditing:', isEditing)
+        if (isEditing && saveSnippetRef.current) {
+          console.log('Calling save function from ref')
+          saveSnippetRef.current()
+        }
+        return
       }
-      // Escape to cancel editing
-      if (e.key === 'Escape' && isEditing) {
-        setIsEditing(false)
+      // Escape to cancel editing or close modals (priority: modals first, then editing)
+      if (e.key === 'Escape') {
+        if (showShortcutsHelp) {
+          setShowShortcutsHelp(false)
+        } else if (isEditing) {
+          setIsEditing(false)
+        }
+        return
       }
-      // Cmd/Ctrl + B to toggle sidebar
-      if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+      // Cmd/Ctrl + Shift + B to toggle sidebar
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'B' || e.key === 'b')) {
         e.preventDefault()
-        setSidebarCollapsed(!sidebarCollapsed)
+        setSidebarCollapsed(prev => !prev)
+        return
+      }
+      // Cmd/Ctrl + / to show shortcuts help
+      if ((e.metaKey || e.ctrlKey) && e.key === '/') {
+        e.preventDefault()
+        setShowShortcutsHelp(prev => !prev)
+        return
+      }
+      // Cmd/Ctrl + E for inline code (when editing)
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'e') {
+        if (isEditing && quillRef.current) {
+          e.preventDefault()
+          e.stopPropagation()
+          const quill = quillRef.current.getEditor()
+          const format = quill.getFormat()
+          quill.format('code', !format.code)
+        }
+        return
+      }
+      // Cmd/Ctrl + Shift + C for code block (when editing)
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'C' || e.key === 'c')) {
+        if (isEditing && quillRef.current) {
+          e.preventDefault()
+          e.stopPropagation()
+          console.log('Code block shortcut triggered')
+          const quill = quillRef.current.getEditor()
+          const format = quill.getFormat()
+          quill.format('code-block', !format['code-block'])
+        }
+        return
       }
     }
     
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isEditing, sidebarCollapsed])
+    // Use capture phase to catch events before they reach Quill
+    window.addEventListener('keydown', handleKeyDown, true)
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing, sidebarCollapsed, showShortcutsHelp])
+
+  // Customize Quill toolbar icons whenever editor is shown
+  useEffect(() => {
+    if (quillRef.current && isEditing) {
+      // Small delay to ensure Quill toolbar is fully rendered
+      const timer = setTimeout(() => {
+        const quill = quillRef.current.getEditor()
+        const toolbar = quill.getModule('toolbar')
+        
+        if (toolbar && toolbar.container) {
+          // Find and customize the inline code button
+          const codeButton = toolbar.container.querySelector('button.ql-code')
+          if (codeButton) {
+            codeButton.innerHTML = '<span style="font-family: monospace; font-weight: bold; font-size: 12px; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">&lt;&gt;</span>'
+            codeButton.setAttribute('title', 'Inline Code')
+            codeButton.style.display = 'flex'
+            codeButton.style.alignItems = 'center'
+            codeButton.style.justifyContent = 'center'
+          }
+          
+          // Find and customize the code-block button
+          const codeBlockButton = toolbar.container.querySelector('button.ql-code-block')
+          if (codeBlockButton) {
+            codeBlockButton.innerHTML = '<span style="font-family: monospace; font-weight: bold; font-size: 12px; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; letter-spacing: 1px;">{}</span>'
+            codeBlockButton.setAttribute('title', 'Code Block')
+            codeBlockButton.style.display = 'flex'
+            codeBlockButton.style.alignItems = 'center'
+            codeBlockButton.style.justifyContent = 'center'
+          }
+        }
+      }, 100)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [isEditing])
 
   const loadSnippets = async () => {
     try {
@@ -331,11 +445,15 @@ function App() {
   }
 
   const handleSaveSnippet = async () => {
-    if (!title.trim()) {
+    console.log('handleSaveSnippet called', { title, content: content?.substring(0, 50) })
+    
+    if (!title?.trim()) {
+      console.log('Title validation failed')
       showToast('Title is required', 'error')
       return
     }
-    if (!content.trim()) {
+    if (!content?.trim()) {
+      console.log('Content validation failed')
       showToast('Content is required', 'error')
       return
     }
@@ -353,6 +471,8 @@ function App() {
     try {
       const savedTitle = title.trim()
       const savedId = currentSnippet?.id
+      
+      console.log('Saving snippet...', { savedId, savedTitle })
       
       if (currentSnippet) {
         await invoke('update_snippet', { id: currentSnippet.id, snippet })
@@ -428,6 +548,7 @@ function App() {
         searchQuery={searchQuery}
         isSearchOpen={isSearchModalOpen}
         onClearSearch={() => setSearchQuery('')}
+        onShowShortcuts={() => setShowShortcutsHelp(true)}
       />
 
       {/* Search Modal */}
@@ -779,6 +900,104 @@ function App() {
           </a>
         </p>
       </div>
+
+      {/* Keyboard Shortcuts Help Modal */}
+      {showShortcutsHelp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowShortcutsHelp(false)}>
+          <div className="bg-background border border-border rounded-lg shadow-lg max-w-2xl w-full mx-4 max-h-[80vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-background border-b px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Keyboard className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-semibold">Keyboard Shortcuts</h2>
+              </div>
+              <button onClick={() => setShowShortcutsHelp(false)} className="hover:bg-accent rounded p-1">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* General Shortcuts */}
+              <div>
+                <h3 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">General</h3>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
+                    <span className="text-xs">Search snippets</span>
+                    <kbd className="px-2 py-1 text-[10px] font-medium bg-muted border border-border rounded">{isMac ? '⌘' : 'Ctrl'} K</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
+                    <span className="text-xs">New snippet</span>
+                    <kbd className="px-2 py-1 text-[10px] font-medium bg-muted border border-border rounded">{isMac ? '⌘' : 'Ctrl'} N</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
+                    <span className="text-xs">Toggle sidebar</span>
+                    <kbd className="px-2 py-1 text-[10px] font-medium bg-muted border border-border rounded">{isMac ? '⌘' : 'Ctrl'} Shift B</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
+                    <span className="text-xs">Show shortcuts</span>
+                    <kbd className="px-2 py-1 text-[10px] font-medium bg-muted border border-border rounded">{isMac ? '⌘' : 'Ctrl'} /</kbd>
+                  </div>
+                </div>
+              </div>
+
+              {/* Editor Shortcuts */}
+              <div>
+                <h3 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Editor</h3>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
+                    <span className="text-xs">Save snippet</span>
+                    <kbd className="px-2 py-1 text-[10px] font-medium bg-muted border border-border rounded">{isMac ? '⌘' : 'Ctrl'} S</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
+                    <span className="text-xs">Cancel editing</span>
+                    <kbd className="px-2 py-1 text-[10px] font-medium bg-muted border border-border rounded">Esc</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
+                    <div className="flex items-center gap-2">
+                      <Code className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-xs">Inline code</span>
+                    </div>
+                    <kbd className="px-2 py-1 text-[10px] font-medium bg-muted border border-border rounded">{isMac ? '⌘' : 'Ctrl'} E</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
+                    <div className="flex items-center gap-2">
+                      <Braces className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-xs">Code block</span>
+                    </div>
+                    <kbd className="px-2 py-1 text-[10px] font-medium bg-muted border border-border rounded">{isMac ? '⌘' : 'Ctrl'} Shift C</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
+                    <span className="text-xs">Insert tab (in code block)</span>
+                    <kbd className="px-2 py-1 text-[10px] font-medium bg-muted border border-border rounded">Tab</kbd>
+                  </div>
+                </div>
+              </div>
+
+              {/* Text Formatting */}
+              <div>
+                <h3 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Text Formatting</h3>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
+                    <span className="text-xs font-bold">Bold</span>
+                    <kbd className="px-2 py-1 text-[10px] font-medium bg-muted border border-border rounded">{isMac ? '⌘' : 'Ctrl'} B</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
+                    <span className="text-xs italic">Italic</span>
+                    <kbd className="px-2 py-1 text-[10px] font-medium bg-muted border border-border rounded">{isMac ? '⌘' : 'Ctrl'} I</kbd>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
+                    <span className="text-xs underline">Underline</span>
+                    <kbd className="px-2 py-1 text-[10px] font-medium bg-muted border border-border rounded">{isMac ? '⌘' : 'Ctrl'} U</kbd>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="border-t px-4 py-3 bg-muted/30">
+              <p className="text-[10px] text-muted-foreground text-center">
+                Press <kbd className="px-1.5 py-0.5 bg-background border border-border rounded text-[10px]">Esc</kbd> to close
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confirmation Dialog */}
       <ConfirmDialog

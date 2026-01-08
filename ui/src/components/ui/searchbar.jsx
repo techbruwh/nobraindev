@@ -1,4 +1,4 @@
-import { Search, Sparkles, X, Star } from 'lucide-react'
+import { Search, Sparkles, X, Star, Keyboard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirmdialog'
 import { useState } from 'react'
@@ -9,7 +9,8 @@ export function SearchBar({
   isMac,
   searchQuery,
   isSearchOpen,
-  onClearSearch
+  onClearSearch,
+  onShowShortcuts
 }) {
   const [showGitHubDialog, setShowGitHubDialog] = useState(false)
   return (
@@ -69,16 +70,27 @@ export function SearchBar({
         </button>
       )}
       
-      {/* Star on GitHub Button - Right side */}
-      <Button 
-        variant="outline" 
-        size="sm" 
-        className="gap-1 shrink-0 z-10"
-        onClick={() => setShowGitHubDialog(true)}
-      >
-        <Star className="h-3 w-3" />
-        <span className="hidden sm:inline">Star on GitHub</span>
-      </Button>
+      {/* Right side buttons */}
+      <div className="flex items-center gap-2 shrink-0 z-10">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="gap-1"
+          onClick={onShowShortcuts}
+          title="Keyboard Shortcuts (⌘/)"
+        >
+          <Keyboard className="h-3.5 w-3.5" />
+        </Button>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="gap-1"
+          onClick={() => setShowGitHubDialog(true)}
+        >
+          <Star className="h-3 w-3" />
+          <span className="hidden sm:inline">Star on GitHub</span>
+        </Button>
+      </div>
 
       <ConfirmDialog
         isOpen={showGitHubDialog}
