@@ -1,6 +1,7 @@
 import { Search, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { useEffect, useRef } from 'react'
 
 export function SnippetsPanel({ 
   snippets, 
@@ -9,6 +10,19 @@ export function SnippetsPanel({
   onNewSnippet,
   sidebarCollapsed 
 }) {
+  const snippetRefs = useRef({})
+  const containerRef = useRef(null)
+
+  // Auto-scroll to selected snippet when it changes
+  useEffect(() => {
+    if (currentSnippet?.id && snippetRefs.current[currentSnippet.id]) {
+      snippetRefs.current[currentSnippet.id].scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest'
+      })
+    }
+  }, [currentSnippet?.id])
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -25,10 +39,11 @@ export function SnippetsPanel({
       </div>
 
       {/* Snippets List */}
-      <div className="flex-1 overflow-y-auto p-1 space-y-1">
+      <div ref={containerRef} className="flex-1 overflow-y-auto p-1 space-y-1">
         {snippets.map((snippet) => (
           <button
             key={snippet.id}
+            ref={(el) => snippetRefs.current[snippet.id] = el}
             className={`w-full p-2 rounded-md transition-colors text-left group border ${
               currentSnippet?.id === snippet.id 
                 ? 'bg-accent border-primary' 
