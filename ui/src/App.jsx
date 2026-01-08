@@ -114,10 +114,41 @@ function App() {
     }
   }, [isResizing])
 
-  // Setup Quill tab handler
+  // Setup Quill tab handler and fix spaces after load
   useEffect(() => {
-    if (quillRef.current && isEditing) {
+    if (quillRef.current && isEditing && currentSnippet) {
       const quill = quillRef.current.getEditor()
+      
+      // Fix spaces in code blocks after content loads by directly manipulating the DOM
+      const fixSpaces = () => {
+        // Parse the original content to find spaces
+        const parser = new DOMParser()
+        const doc = parser.parseFromString(currentSnippet.content, 'text/html')
+        const originalBlocks = doc.querySelectorAll('.ql-code-block')
+        const editorBlocks = quill.root.querySelectorAll('.ql-code-block')
+        
+        // Compare and restore spaces
+        originalBlocks.forEach((originalBlock, index) => {
+          if (editorBlocks[index]) {
+            const originalText = originalBlock.textContent
+            const editorText = editorBlocks[index].textContent
+            
+            // If original had leading spaces but editor doesn't
+            const originalLeading = originalText.match(/^(\s+)/)
+            const editorLeading = editorText.match(/^(\s+)/)
+            
+            if (originalLeading && (!editorLeading || originalLeading[1].length > (editorLeading[1] || '').length)) {
+              // Restore the spaces by directly setting innerHTML with &nbsp;
+              const spaces = originalLeading[1]
+              const rest = originalText.substring(spaces.length)
+              editorBlocks[index].innerHTML = spaces.replace(/ /g, '&nbsp;') + rest
+            }
+          }
+        })
+      }
+      
+      // Run after Quill finishes rendering
+      setTimeout(fixSpaces, 300)
       
       // Override tab key behavior
       const handleTab = (e) => {
@@ -128,9 +159,6 @@ function App() {
             if (format['code-block']) {
               e.preventDefault()
               e.stopPropagation()
-              
-              // Get the current line
-              const [line] = quill.getLine(selection.index)
               
               // Insert HTML with non-breaking spaces directly
               const range = quill.getSelection()
@@ -156,7 +184,7 @@ function App() {
         editorElement.removeEventListener('keydown', handleTab, { capture: true })
       }
     }
-  }, [isEditing])
+  }, [isEditing, content])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -284,7 +312,22 @@ function App() {
     setLanguage(snippet.language)
     setTags(snippet.tags || '')
     setDescription(snippet.description || '')
-    setContent(snippet.content)
+    
+    // Use zero-width non-joiner (&#8204;) before spaces to preserve them
+    // This character is invisible but prevents Quill from stripping spaces
+    let preservedContent = snippet.content
+    preservedContent = preservedContent.replace(
+      /(<div class="ql-code-block"[^>]*>)(\s+)/g,
+      (match, tag, spaces) => {
+        // Add zero-width non-joiner before each space
+        const preserved = spaces.split('').map(char => 
+          char === ' ' ? '\u200C ' : char
+        ).join('')
+        return tag + preserved
+      }
+    )
+    
+    setContent(preservedContent)
   }
 
   const handleSaveSnippet = async () => {
