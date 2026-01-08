@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.2] - 2026-01-09
+
+### 🐛 Bug Fixes
+-  broken gha release yaml for windows due to linux command usage
+
+
+
 ## [1.0.1] - 2026-01-09
 
 ### 🐛 Bug Fixes
