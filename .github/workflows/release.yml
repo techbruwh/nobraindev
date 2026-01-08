@@ -57,21 +57,22 @@ jobs:
             libgtk-3-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev
-
+            
       - name: Install frontend dependencies
         run: |
           cd ui
           npm install
-          - name: Create production environment
-          run: |
-            cd ui
-            cat > .env.production << EOF
-            VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
-            VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
-            VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
-            VITE_APP_ENV=production
-            EOF
-            
+      
+      - name: Create production environment
+        run: |
+          cd ui
+          cat > .env.production << EOF
+          VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_APP_ENV=production
+          EOF    
+
       - name: Build frontend
         run: |
           cd ui
