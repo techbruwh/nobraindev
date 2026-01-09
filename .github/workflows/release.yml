@@ -72,9 +72,11 @@ jobs:
           echo "VITE_APP_ENV=production" >> .env.production  
 
       - name: Build frontend
+        env:
+          NODE_ENV: production
         run: |
           cd ui
-          npm run build -- --mode production
+          npm run build
 
       # macOS Code Signing Setup
       - name: Import Apple Code Signing Certificate

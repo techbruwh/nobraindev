@@ -179,7 +179,7 @@ export class SyncService {
   }
 
   /**
-   * Check if user has sync approval
+   * Check if user has sync approval and encryption status
    */
   async checkSyncApproval(userEmail) {
     if (!isSupabaseConfigured()) {
@@ -189,7 +189,7 @@ export class SyncService {
     try {
       const { data, error } = await supabase
         .from('user_approvals')
-        .select('approved, requested_at')
+        .select('approved, requested_at, encryption_enabled')
         .eq('user_email', userEmail)
         .single()
 
@@ -213,12 +213,16 @@ export class SyncService {
     }
 
     try {
+      // Use upsert to handle existing records (409 conflict)
       const { error } = await supabase
         .from('user_approvals')
-        .insert({
+        .upsert({
           user_email: userEmail,
           approved: false,
           requested_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_email',
+          ignoreDuplicates: false
         })
 
       if (error) throw error

@@ -1,4 +1,4 @@
-import { User, Cloud, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react'
+import { User, Cloud, RefreshCw, CheckCircle, AlertCircle, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useState, useEffect } from 'react'
@@ -288,6 +288,23 @@ export function AccountPanel({
               ) : (
                 // Approved - show sync button
                 <>
+                  {/* Encryption Status Badge */}
+                  {syncApproval.encryption_enabled && (
+                    <div className="p-2 bg-green-500/10 border border-green-500/20 rounded-md">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-3.5 w-3.5 text-green-600" />
+                        <div className="flex-1">
+                          <p className="text-[10px] font-semibold text-green-600">
+                            End-to-End Encryption Enabled
+                          </p>
+                          <p className="text-[9px] text-green-600/80">
+                            Your snippets are encrypted in the cloud
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <Button 
                     variant={hasUnsyncedChanges ? "default" : "secondary"}
                     className="w-full justify-start gap-2" 
