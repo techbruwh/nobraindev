@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.11] - 2026-01-09
+
+### 🐛 Bug Fixes
+-  pass env vars directly to vite build
+
+
+
 ## [1.0.10] - 2026-01-09
 
 ### 🐛 Bug Fixes
