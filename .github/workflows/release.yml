@@ -123,7 +123,7 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'NoBrainDev ${{ github.ref_name }}'
           releaseBody: 'See the CHANGELOG.md for details.'
-          releaseDraft: false
+          releaseDraft: true
           prerelease: false
           args: --target ${{ matrix.platform.rust_target }}
 
