@@ -199,25 +199,45 @@ export function AccountPanel({
               </div>
             )}
 
-            <SignInButton mode="modal">
-              <Button 
-                className="w-full"
-                variant="default"
-                disabled={!isClerkConfigured()}
-              >
-                Sign In
-              </Button>
-            </SignInButton>
+            {isClerkConfigured() ? (
+              <>
+                <SignInButton mode="modal">
+                  <Button 
+                    className="w-full"
+                    variant="default"
+                  >
+                    Sign In
+                  </Button>
+                </SignInButton>
 
-            <SignUpButton mode="modal">
-              <Button 
-                className="w-full"
-                variant="outline"
-                disabled={!isClerkConfigured()}
-              >
-                Sign Up
-              </Button>
-            </SignUpButton>
+                <SignUpButton mode="modal">
+                  <Button 
+                    className="w-full"
+                    variant="outline"
+                  >
+                    Sign Up
+                  </Button>
+                </SignUpButton>
+              </>
+            ) : (
+              <>
+                <Button 
+                  className="w-full"
+                  variant="default"
+                  disabled
+                >
+                  Sign In
+                </Button>
+
+                <Button 
+                  className="w-full"
+                  variant="outline"
+                  disabled
+                >
+                  Sign Up
+                </Button>
+              </>
+            )}
 
             <div className="pt-3 border-t">
               <div className="flex items-start gap-2 text-[10px] text-muted-foreground">
