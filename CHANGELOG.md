@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.13] - 2026-01-09
+
+### 🐛 Bug Fixes
+-  using dotenv to load values from env var in local and ci/cd
+
+
+
 ## [1.0.12] - 2026-01-09
 
 ### 🐛 Bug Fixes
