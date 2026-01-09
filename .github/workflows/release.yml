@@ -74,7 +74,7 @@ jobs:
       - name: Build frontend
         run: |
           cd ui
-          npm run build
+          npm run build -- --mode production
 
       # macOS Code Signing Setup
       - name: Import Apple Code Signing Certificate
