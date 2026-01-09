@@ -52,7 +52,7 @@ export function MenuSidebar({ activeMenu, onMenuChange, sidebarCollapsed }) {
       <div className="flex-1" />
       
       {/* Version indicator or other bottom content can go here */}
-      <div className="text-[8px] text-muted-foreground/50 z-10">v1.0.8</div>
+      <div className="text-[8px] text-muted-foreground/50 z-10">v1.0.9</div>
     </div>
   )
 }
