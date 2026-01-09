@@ -1,4 +1,4 @@
-import { User, Cloud, RefreshCw, CheckCircle, AlertCircle, Shield, Mail, Lock } from 'lucide-react'
+import { User, ShieldCheck, RefreshCw, CheckCircle, AlertCircle, Shield, Mail, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -410,8 +410,8 @@ export function AccountPanel({
 
             <div className="pt-3 border-t">
               <div className="flex items-start gap-2 text-[10px] text-muted-foreground">
-                <Cloud className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                <p>Your snippets will be synced securely to the cloud</p>
+                <ShieldCheck className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                <p>Your snippets will be synced securely to the cloud using end to end encryption so no one can read it except you.</p>
               </div>
             </div>
           </div>

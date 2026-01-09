@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { Plus, Search, FileCode, X, Edit, Trash2, Copy, Save, Brain, Download, Sparkles, CheckCircle, AlertCircle, Info, PanelLeftClose, PanelLeft, Keyboard, Code, Braces, RefreshCw, Cloud } from 'lucide-react'
+import { Plus, Search, FileCode, X, Edit, Trash2, Copy, Save, Brain, Download, Sparkles, CheckCircle, AlertCircle, Info, PanelLeftClose, PanelLeft, Keyboard, Code, Braces, RefreshCw, Cloud, User } from 'lucide-react'
+import { useUser } from '@clerk/clerk-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -16,6 +17,7 @@ import 'react-quill-new/dist/quill.snow.css'
 import './editor.css'
 
 function App() {
+  const { isSignedIn } = useUser()
   const [snippets, setSnippets] = useState([])
   const [currentSnippet, setCurrentSnippet] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
@@ -897,21 +899,36 @@ function App() {
               Last synced: {lastSyncTime.toLocaleTimeString()}
             </span>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 px-2 text-[10px] gap-1"
-            disabled={!hasUnsyncedChanges || isSyncingFromFooter}
-            onClick={() => {
-              setIsSyncingFromFooter(true)
-              // Trigger sync from footer
-              const event = new CustomEvent('footer-sync-clicked')
-              window.dispatchEvent(event)
-            }}
-          >
-            <RefreshCw className={`h-3 w-3 ${isSyncingFromFooter ? 'animate-spin' : ''}`} />
-            {isSyncingFromFooter ? 'Syncing...' : hasUnsyncedChanges ? 'Sync Now' : 'All Synced'}
-          </Button>
+          {isSignedIn ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-[10px] gap-1"
+              disabled={!hasUnsyncedChanges || isSyncingFromFooter}
+              onClick={() => {
+                setIsSyncingFromFooter(true)
+                // Trigger sync from footer
+                const event = new CustomEvent('footer-sync-clicked')
+                window.dispatchEvent(event)
+              }}
+            >
+              <RefreshCw className={`h-3 w-3 ${isSyncingFromFooter ? 'animate-spin' : ''}`} />
+              {isSyncingFromFooter ? 'Syncing...' : hasUnsyncedChanges ? 'Sync Now' : 'All Synced'}
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-[10px] gap-1 opacity-50 cursor-not-allowed"
+              disabled
+              title="Sign in to enable cloud sync"
+              onClick={() => setActiveMenu('account')}
+            >
+              <Cloud className="h-3 w-3" />
+              <span className="hidden sm:inline">Cloud Sync Disabled</span>
+              <span className="sm:hidden">Sync Off</span>
+            </Button>
+          )}
         </div>
       </div>
 
