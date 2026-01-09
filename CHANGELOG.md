@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.8] - 2026-01-09
+
+### 🐛 Bug Fixes
+-  release pipeline to create both .env and env.production
+
+
+
 ## [1.0.7] - 2026-01-09
 
 ### ✨ Features
