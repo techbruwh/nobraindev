@@ -74,6 +74,16 @@ else
     sed -i "s/badge\/version-[0-9.]*-blue/badge\/version-$NEW_VERSION-blue/" README.md
 fi
 
+# Update version in MenuSidebar component
+echo -e "${BLUE}📝 Updating ui/src/components/ui/menusidebar.jsx...${NC}"
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS
+    sed -i '' "s/v[0-9.]*<\/div>/v$NEW_VERSION<\/div>/" ui/src/components/ui/menusidebar.jsx
+else
+    # Linux/WSL
+    sed -i "s/v[0-9.]*<\/div>/v$NEW_VERSION<\/div>/" ui/src/components/ui/menusidebar.jsx
+fi
+
 echo ""
 echo -e "${GREEN}✅ Version updated to $NEW_VERSION${NC}"
 echo ""
@@ -167,7 +177,7 @@ echo ""
 
 # Add all changes
 echo -e "${BLUE}📦 Adding files...${NC}"
-git add src-tauri/Cargo.toml src-tauri/tauri.conf.json README.md CHANGELOG.md
+git add src-tauri/Cargo.toml src-tauri/tauri.conf.json README.md CHANGELOG.md ui/src/components/ui/menusidebar.jsx
 
 # Show what will be committed
 echo -e "${BLUE}📋 Changes to commit:${NC}"
