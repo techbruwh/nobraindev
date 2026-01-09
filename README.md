@@ -5,7 +5,7 @@
   
   ### A powerful, tiny, AI-powered desktop application for managing your code snippets written in Rust.
   
-  ![NoBrainDev](https://img.shields.io/badge/version-1.0.15-blue)
+  ![NoBrainDev](https://img.shields.io/badge/version-1.0.16-blue)
   ![License](https://img.shields.io/badge/license-MIT-green)
   ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 </div>

@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.16] - 2026-01-09
+
+### 🐛 Bug Fixes
+-  using email and code to register and login
+
+
+
 ## [1.0.15] - 2026-01-09
 
 ### 🐛 Bug Fixes
