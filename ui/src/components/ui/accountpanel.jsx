@@ -201,7 +201,7 @@ export function AccountPanel({
 
             {isClerkConfigured() ? (
               <>
-                <SignInButton mode="modal">
+                <SignInButton mode="redirect">
                   <Button 
                     className="w-full"
                     variant="default"
@@ -210,7 +210,7 @@ export function AccountPanel({
                   </Button>
                 </SignInButton>
 
-                <SignUpButton mode="modal">
+                <SignUpButton mode="redirect">
                   <Button 
                     className="w-full"
                     variant="outline"
