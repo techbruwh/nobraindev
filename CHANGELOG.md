@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.17] - 2026-01-09
+
+### 🐛 Bug Fixes
+-  fix sync status
+
+
+
 ## [1.0.16] - 2026-01-09
 
 ### 🐛 Bug Fixes
