@@ -1,8 +1,9 @@
-import { User, Cloud, RefreshCw, CheckCircle, AlertCircle, Shield } from 'lucide-react'
+import { User, Cloud, RefreshCw, CheckCircle, AlertCircle, Shield, Mail, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { useState, useEffect } from 'react'
-import { SignInButton, SignOutButton, SignUpButton, useUser } from '@clerk/clerk-react'
+import { SignOutButton, useUser, useSignIn, useSignUp } from '@clerk/clerk-react'
 import { authService } from '@/lib/auth'
 import { syncService } from '@/lib/sync'
 import { isClerkConfigured } from '@/lib/clerk'
@@ -14,12 +15,21 @@ export function AccountPanel({
   lastSyncTime: externalLastSyncTime 
 }) {
   const { isSignedIn, user: clerkUser } = useUser()
+  const { signIn, setActive: setActiveSignIn } = useSignIn()
+  const { signUp, setActive: setActiveSignUp } = useSignUp()
+  
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncStatus, setSyncStatus] = useState(null)
   const [error, setError] = useState(null)
   const [localLastSyncTime, setLocalLastSyncTime] = useState(null)
   const [syncApproval, setSyncApproval] = useState(null)
   const [checkingApproval, setCheckingApproval] = useState(false)
+  
+  // Auth UI state
+  const [email, setEmail] = useState('')
+  const [code, setCode] = useState('')
+  const [isAuthenticating, setIsAuthenticating] = useState(false)
+  const [verificationStep, setVerificationStep] = useState(false) // false = email input, true = code input
   
   const lastSyncTime = externalLastSyncTime || localLastSyncTime
 
@@ -63,6 +73,99 @@ export function AccountPanel({
       })
     } catch (error) {
       setError('Failed to request access. Please try again.')
+    }
+  }
+
+  const handleSendCode = async (e) => {
+    e.preventDefault()
+    if (!signIn || !email) return
+
+    setIsAuthenticating(true)
+    setError(null)
+
+    try {
+      // Try to sign in first (for existing users)
+      const result = await signIn.create({
+        identifier: email,
+      })
+
+      // Prepare email code verification
+      await result.prepareFirstFactor({
+        strategy: 'email_code',
+        emailAddressId: result.supportedFirstFactors.find(
+          (factor) => factor.strategy === 'email_code'
+        )?.emailAddressId,
+      })
+
+      setVerificationStep(true)
+    } catch (err) {
+      // If user doesn't exist, try sign up
+      if (err.errors?.[0]?.code === 'form_identifier_not_found') {
+        try {
+          if (!signUp) return
+          
+          await signUp.create({
+            emailAddress: email,
+          })
+
+          await signUp.prepareEmailAddressVerification({
+            strategy: 'email_code',
+          })
+
+          setVerificationStep(true)
+        } catch (signUpErr) {
+          console.error('Sign up error:', signUpErr)
+          setError(signUpErr.errors?.[0]?.message || 'Failed to send code. Please try again.')
+        }
+      } else {
+        console.error('Send code error:', err)
+        setError(err.errors?.[0]?.message || 'Failed to send code. Please try again.')
+      }
+    } finally {
+      setIsAuthenticating(false)
+    }
+  }
+
+  const handleVerifyCode = async (e) => {
+    e.preventDefault()
+    if (!code) return
+
+    setIsAuthenticating(true)
+    setError(null)
+
+    try {
+      // Try sign in verification first
+      if (signIn && signIn.status === 'needs_first_factor') {
+        const result = await signIn.attemptFirstFactor({
+          strategy: 'email_code',
+          code: code,
+        })
+
+        if (result.status === 'complete') {
+          await setActiveSignIn({ session: result.createdSessionId })
+          setEmail('')
+          setCode('')
+          setVerificationStep(false)
+        }
+      } 
+      // Otherwise try sign up verification
+      else if (signUp && signUp.status === 'missing_requirements') {
+        const result = await signUp.attemptEmailAddressVerification({
+          code: code,
+        })
+
+        if (result.status === 'complete') {
+          await setActiveSignUp({ session: result.createdSessionId })
+          setEmail('')
+          setCode('')
+          setVerificationStep(false)
+        }
+      }
+    } catch (err) {
+      console.error('Verify code error:', err)
+      setError(err.errors?.[0]?.message || 'Invalid code. Please try again.')
+    } finally {
+      setIsAuthenticating(false)
     }
   }
 
@@ -200,25 +303,99 @@ export function AccountPanel({
             )}
 
             {isClerkConfigured() ? (
-              <>
-                <SignInButton mode="redirect">
+              !verificationStep ? (
+                <form onSubmit={handleSendCode} className="space-y-3">
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="email"
+                        placeholder="Email address"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="pl-10 text-xs"
+                        required
+                        disabled={isAuthenticating}
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+
                   <Button 
+                    type="submit"
                     className="w-full"
                     variant="default"
+                    disabled={isAuthenticating || !email}
                   >
-                    Sign In
+                    {isAuthenticating ? (
+                      <>
+                        <RefreshCw className="h-3.5 w-3.5 mr-2 animate-spin" />
+                        Sending code...
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="h-3.5 w-3.5 mr-2" />
+                        Continue with Email
+                      </>
+                    )}
                   </Button>
-                </SignInButton>
 
-                <SignUpButton mode="redirect">
+                  <p className="text-[9px] text-center text-muted-foreground px-2">
+                    We'll send you a verification code to sign in or create an account
+                  </p>
+                </form>
+              ) : (
+                <form onSubmit={handleVerifyCode} className="space-y-3">
+                  <div className="space-y-2">
+                    <p className="text-[10px] text-muted-foreground text-center">
+                      Enter the code sent to <span className="font-semibold">{email}</span>
+                    </p>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="text"
+                        placeholder="Enter verification code"
+                        value={code}
+                        onChange={(e) => setCode(e.target.value)}
+                        className="pl-10 text-xs text-center tracking-widest"
+                        required
+                        disabled={isAuthenticating}
+                        autoFocus
+                        maxLength={6}
+                      />
+                    </div>
+                  </div>
+
                   <Button 
+                    type="submit"
                     className="w-full"
-                    variant="outline"
+                    variant="default"
+                    disabled={isAuthenticating || !code}
                   >
-                    Sign Up
+                    {isAuthenticating ? (
+                      <>
+                        <RefreshCw className="h-3.5 w-3.5 mr-2 animate-spin" />
+                        Verifying...
+                      </>
+                    ) : (
+                      'Verify Code'
+                    )}
                   </Button>
-                </SignUpButton>
-              </>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVerificationStep(false)
+                      setCode('')
+                      setError(null)
+                    }}
+                    className="w-full text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                    disabled={isAuthenticating}
+                  >
+                    ← Use a different email
+                  </button>
+                </form>
+              )
             ) : (
               <>
                 <Button 
@@ -227,14 +404,6 @@ export function AccountPanel({
                   disabled
                 >
                   Sign In
-                </Button>
-
-                <Button 
-                  className="w-full"
-                  variant="outline"
-                  disabled
-                >
-                  Sign Up
                 </Button>
               </>
             )}

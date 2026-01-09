@@ -21,7 +21,6 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_localhost::Builder::new(1420).build())
         .manage(AppState {
             db: Mutex::new(db),
             search_engine: Mutex::new(None),
