@@ -1,4 +1,4 @@
-import { Search, Plus } from 'lucide-react'
+import { Search, Plus, FileCode } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useEffect, useRef } from 'react'
@@ -28,12 +28,13 @@ export function SnippetsPanel({
       {/* Header */}
       <div className="p-2 border-b space-y-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <h1 className="text-sm font-semibold">Snippets</h1>
-            <Badge variant="secondary">{snippets.length}</Badge>
-          </div>
+        <div className="flex items-center gap-1.5">
+          <FileCode className="h-4 w-4 text-muted-foreground" />
+          <h1 className="text-sm font-semibold">Snippets</h1>
+          <Badge variant="secondary">{snippets.length}</Badge>
+        </div>
           <Button onClick={onNewSnippet} size="sm">
-            <Plus className="h-3.5 w-3.5" /> New snippet
+            <Plus className="h-3.5 w-3.5" />New
           </Button>
         </div>
       </div>
