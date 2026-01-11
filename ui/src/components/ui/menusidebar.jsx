@@ -1,5 +1,4 @@
 import { FileCode, MessageSquare, User } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 
 export function MenuSidebar({ activeMenu, onMenuChange, sidebarCollapsed }) {
   const menuItems = [
@@ -38,12 +37,6 @@ export function MenuSidebar({ activeMenu, onMenuChange, sidebarCollapsed }) {
                 : 'text-muted-foreground group-hover:text-foreground'
             }`} />
             
-            {/* Dev Badge */}
-            {item.badge && (
-              <span className="absolute -top-1 -right-1 px-1 py-0 text-[7px] font-bold bg-amber-500 text-white rounded">
-                {item.badge}
-              </span>
-            )}
           </button>
         )
       })}

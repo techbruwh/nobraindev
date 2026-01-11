@@ -1,12 +1,9 @@
-import { User, ShieldCheck, RefreshCw, CheckCircle, AlertCircle, Shield, Mail, Lock } from 'lucide-react'
+import { User, ShieldCheck, RefreshCw, CheckCircle, AlertCircle, Shield, Chrome } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
 import { useState, useEffect } from 'react'
-import { SignOutButton, useUser, useSignIn, useSignUp } from '@clerk/clerk-react'
-import { authService } from '@/lib/auth'
+import { useSupabaseAuth } from '@/lib/supabase-auth'
 import { syncService } from '@/lib/sync'
-import { isClerkConfigured } from '@/lib/clerk'
+import { isSupabaseConfigured } from '@/lib/supabase'
 
 export function AccountPanel({ 
   hasUnsyncedChanges, 
@@ -14,9 +11,8 @@ export function AccountPanel({
   onSyncStart,
   lastSyncTime: externalLastSyncTime 
 }) {
-  const { isSignedIn, user: clerkUser } = useUser()
-  const { signIn, setActive: setActiveSignIn } = useSignIn()
-  const { signUp, setActive: setActiveSignUp } = useSignUp()
+  const { user, signInWithGoogle, signOut } = useSupabaseAuth()
+  const isSignedIn = !!user
   
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncStatus, setSyncStatus] = useState(null)
@@ -26,26 +22,21 @@ export function AccountPanel({
   const [checkingApproval, setCheckingApproval] = useState(false)
   
   // Auth UI state
-  const [email, setEmail] = useState('')
-  const [code, setCode] = useState('')
   const [isAuthenticating, setIsAuthenticating] = useState(false)
-  const [verificationStep, setVerificationStep] = useState(false) // false = email input, true = code input
   
   const lastSyncTime = externalLastSyncTime || localLastSyncTime
 
-  // Sync Clerk user with auth service
+  // Check approval status when user signs in
   useEffect(() => {
-    if (isSignedIn && clerkUser) {
-      authService.setUser(clerkUser)
+    if (isSignedIn && user) {
       checkApprovalStatus()
     } else {
-      authService.clearUser()
       setSyncApproval(null)
     }
-  }, [isSignedIn, clerkUser])
+  }, [isSignedIn, user])
 
   const checkApprovalStatus = async () => {
-    const email = clerkUser?.primaryEmailAddress?.emailAddress
+    const email = user?.email
     if (!email) return
 
     setCheckingApproval(true)
@@ -60,7 +51,7 @@ export function AccountPanel({
   }
 
   const handleRequestAccess = async () => {
-    const email = clerkUser?.primaryEmailAddress?.emailAddress
+    const email = user?.email
     if (!email) return
 
     setError(null)
@@ -76,101 +67,22 @@ export function AccountPanel({
     }
   }
 
-  const handleSendCode = async (e) => {
-    e.preventDefault()
-    if (!signIn || !email) return
-
+  const handleGoogleSignIn = async () => {
     setIsAuthenticating(true)
     setError(null)
 
     try {
-      // Try to sign in first (for existing users)
-      const result = await signIn.create({
-        identifier: email,
-      })
-
-      // Prepare email code verification
-      await result.prepareFirstFactor({
-        strategy: 'email_code',
-        emailAddressId: result.supportedFirstFactors.find(
-          (factor) => factor.strategy === 'email_code'
-        )?.emailAddressId,
-      })
-
-      setVerificationStep(true)
+      await signInWithGoogle()
+      // Google OAuth will redirect, so we don't need to do anything here
     } catch (err) {
-      // If user doesn't exist, try sign up
-      if (err.errors?.[0]?.code === 'form_identifier_not_found') {
-        try {
-          if (!signUp) return
-          
-          await signUp.create({
-            emailAddress: email,
-          })
-
-          await signUp.prepareEmailAddressVerification({
-            strategy: 'email_code',
-          })
-
-          setVerificationStep(true)
-        } catch (signUpErr) {
-          console.error('Sign up error:', signUpErr)
-          setError(signUpErr.errors?.[0]?.message || 'Failed to send code. Please try again.')
-        }
-      } else {
-        console.error('Send code error:', err)
-        setError(err.errors?.[0]?.message || 'Failed to send code. Please try again.')
-      }
-    } finally {
-      setIsAuthenticating(false)
-    }
-  }
-
-  const handleVerifyCode = async (e) => {
-    e.preventDefault()
-    if (!code) return
-
-    setIsAuthenticating(true)
-    setError(null)
-
-    try {
-      // Try sign in verification first
-      if (signIn && signIn.status === 'needs_first_factor') {
-        const result = await signIn.attemptFirstFactor({
-          strategy: 'email_code',
-          code: code,
-        })
-
-        if (result.status === 'complete') {
-          await setActiveSignIn({ session: result.createdSessionId })
-          setEmail('')
-          setCode('')
-          setVerificationStep(false)
-        }
-      } 
-      // Otherwise try sign up verification
-      else if (signUp && signUp.status === 'missing_requirements') {
-        const result = await signUp.attemptEmailAddressVerification({
-          code: code,
-        })
-
-        if (result.status === 'complete') {
-          await setActiveSignUp({ session: result.createdSessionId })
-          setEmail('')
-          setCode('')
-          setVerificationStep(false)
-        }
-      }
-    } catch (err) {
-      console.error('Verify code error:', err)
-      setError(err.errors?.[0]?.message || 'Invalid code. Please try again.')
-    } finally {
+      console.error('Google sign in error:', err)
+      setError(err.message || 'Failed to sign in with Google. Please try again.')
       setIsAuthenticating(false)
     }
   }
 
   const handleSync = async () => {
-    const email = clerkUser?.primaryEmailAddress?.emailAddress
+    const email = user?.email
     if (!email) {
       setError('User email not found')
       return
@@ -240,17 +152,11 @@ export function AccountPanel({
     
     window.addEventListener('footer-sync-clicked', handleFooterSync)
     return () => window.removeEventListener('footer-sync-clicked', handleFooterSync)
-  }, [isSignedIn, syncApproval, hasUnsyncedChanges, clerkUser])
+  }, [isSignedIn, syncApproval, hasUnsyncedChanges, user])
 
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="p-2 border-b">
-        <div className="flex items-center justify-between">
-          <h1 className="text-sm font-semibold">Account</h1>
-          <Badge variant="secondary" className="text-[9px] px-1.5 py-0">DEVELOPMENT</Badge>
-        </div>
-      </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-3">
@@ -294,118 +200,65 @@ export function AccountPanel({
               </p>
             </div>
 
-            {!isClerkConfigured() && (
+            {!isSupabaseConfigured() && (
               <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-md mb-3">
                 <p className="text-[10px] text-amber-600">
-                  Clerk not configured. Add VITE_CLERK_PUBLISHABLE_KEY to .env
+                  Supabase not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env
                 </p>
               </div>
             )}
 
-            {isClerkConfigured() ? (
-              !verificationStep ? (
-                <form onSubmit={handleSendCode} className="space-y-3">
-                  <div className="space-y-2">
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        type="email"
-                        placeholder="Email address"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="pl-10 text-xs"
-                        required
-                        disabled={isAuthenticating}
-                        autoFocus
-                      />
-                    </div>
-                  </div>
-
-                  <Button 
-                    type="submit"
-                    className="w-full"
-                    variant="default"
-                    disabled={isAuthenticating || !email}
-                  >
-                    {isAuthenticating ? (
-                      <>
-                        <RefreshCw className="h-3.5 w-3.5 mr-2 animate-spin" />
-                        Sending code...
-                      </>
-                    ) : (
-                      <>
-                        <Mail className="h-3.5 w-3.5 mr-2" />
-                        Continue with Email
-                      </>
-                    )}
-                  </Button>
-
-                  <p className="text-[9px] text-center text-muted-foreground px-2">
-                    We'll send you a verification code to sign in or create an account
-                  </p>
-                </form>
-              ) : (
-                <form onSubmit={handleVerifyCode} className="space-y-3">
-                  <div className="space-y-2">
-                    <p className="text-[10px] text-muted-foreground text-center">
-                      Enter the code sent to <span className="font-semibold">{email}</span>
-                    </p>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        type="text"
-                        placeholder="Enter verification code"
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
-                        className="pl-10 text-xs text-center tracking-widest"
-                        required
-                        disabled={isAuthenticating}
-                        autoFocus
-                        maxLength={6}
-                      />
-                    </div>
-                  </div>
-
-                  <Button 
-                    type="submit"
-                    className="w-full"
-                    variant="default"
-                    disabled={isAuthenticating || !code}
-                  >
-                    {isAuthenticating ? (
-                      <>
-                        <RefreshCw className="h-3.5 w-3.5 mr-2 animate-spin" />
-                        Verifying...
-                      </>
-                    ) : (
-                      'Verify Code'
-                    )}
-                  </Button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setVerificationStep(false)
-                      setCode('')
-                      setError(null)
-                    }}
-                    className="w-full text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-                    disabled={isAuthenticating}
-                  >
-                    ← Use a different email
-                  </button>
-                </form>
-              )
-            ) : (
-              <>
+            {isSupabaseConfigured() ? (
+              <div className="space-y-2">
+                {/* Google Sign In Button - Improved UI */}
                 <Button 
-                  className="w-full"
-                  variant="default"
-                  disabled
+                  type="button"
+                  className="w-full h-9 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 shadow-sm transition-all hover:shadow-md"
+                  onClick={handleGoogleSignIn}
+                  disabled={isAuthenticating}
                 >
-                  Sign In
+                  {isAuthenticating ? (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5 mr-2 animate-spin" />
+                      <span className="text-xs font-medium">Signing in...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24">
+                        <path
+                          fill="#4285F4"
+                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                        />
+                        <path
+                          fill="#34A853"
+                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                        />
+                        <path
+                          fill="#FBBC05"
+                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                        />
+                        <path
+                          fill="#EA4335"
+                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                        />
+                      </svg>
+                      <span className="text-xs font-medium">Continue with Google</span>
+                    </>
+                  )}
                 </Button>
-              </>
+
+                <p className="text-[9px] text-center text-muted-foreground px-2">
+                  Sign in with your Google account to sync your snippets across devices
+                </p>
+              </div>
+            ) : (
+              <Button 
+                className="w-full"
+                variant="default"
+                disabled
+              >
+                Sign In
+              </Button>
             )}
 
             <div className="pt-3 border-t">
@@ -419,23 +272,15 @@ export function AccountPanel({
           // Logged In View
           <div className="space-y-3">
             <div className="flex items-center gap-3 p-3 bg-accent rounded-md border">
-              {clerkUser?.imageUrl ? (
-                <img 
-                  src={clerkUser.imageUrl} 
-                  alt="User avatar" 
-                  className="h-10 w-10 rounded-full"
-                />
-              ) : (
-                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold text-sm">
-                  {clerkUser?.firstName?.[0]?.toUpperCase() || clerkUser?.primaryEmailAddress?.emailAddress?.[0]?.toUpperCase() || 'U'}
-                </div>
-              )}
+              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold text-sm">
+                {user?.email?.[0]?.toUpperCase() || 'U'}
+              </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold truncate">
-                  {clerkUser?.firstName || clerkUser?.username || clerkUser?.primaryEmailAddress?.emailAddress?.split('@')[0] || 'User'}
+                  {user?.email?.split('@')[0] || 'User'}
                 </p>
                 <p className="text-[10px] text-muted-foreground truncate">
-                  {clerkUser?.primaryEmailAddress?.emailAddress}
+                  {user?.email}
                 </p>
               </div>
             </div>
@@ -517,15 +362,14 @@ export function AccountPanel({
             </div>
 
             <div className="pt-3 border-t">
-              <SignOutButton>
-                <Button 
-                  variant="outline" 
-                  className="w-full" 
-                  size="sm"
-                >
-                  Sign Out
-                </Button>
-              </SignOutButton>
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                size="sm"
+                onClick={signOut}
+              >
+                Sign Out
+              </Button>
             </div>
           </div>
         )}

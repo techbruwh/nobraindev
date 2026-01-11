@@ -40,7 +40,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' ipc: tauri:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://*.clerk.com https://wanted-kodiak-36.clerk.accounts.dev https://challenges.cloudflare.com; connect-src 'self' ipc: tauri: https://*.clerk.accounts.dev https://*.clerk.com https://api.clerk.com https://wanted-kodiak-36.clerk.accounts.dev; img-src 'self' data: https: blob: https://img.clerk.com; style-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://*.clerk.com; frame-src https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com; font-src 'self' data: https://*.clerk.com; worker-src 'self' blob:;",
+      "csp": "default-src 'self' ipc: tauri:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' ipc: tauri: https://*.supabase.co https://srkjunbwdclxymzwvpmt.supabase.co; img-src 'self' data: https: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; worker-src 'self' blob:;",
       "devCsp": null
     }
   },

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { Plus, Search, FileCode, X, Edit, Trash2, Copy, Save, Brain, Download, Sparkles, CheckCircle, AlertCircle, Info, PanelLeftClose, PanelLeft, Keyboard, Code, Braces, RefreshCw, Cloud, User } from 'lucide-react'
-import { useUser } from '@clerk/clerk-react'
+import { useSupabaseAuth } from '@/lib/supabase-auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -17,7 +17,8 @@ import 'react-quill-new/dist/quill.snow.css'
 import './editor.css'
 
 function App() {
-  const { isSignedIn } = useUser()
+  const { user } = useSupabaseAuth()
+  const isSignedIn = !!user
   const [snippets, setSnippets] = useState([])
   const [currentSnippet, setCurrentSnippet] = useState(null)
   const [isEditing, setIsEditing] = useState(false)

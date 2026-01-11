@@ -21,7 +21,6 @@ export default defineConfig({
   },
   envPrefix: ['VITE_', 'TAURI_'],
   define: {
-    'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': JSON.stringify(process.env.VITE_CLERK_PUBLISHABLE_KEY),
     'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(process.env.VITE_SUPABASE_URL),
     'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY),
     'import.meta.env.VITE_APP_ENV': JSON.stringify(process.env.VITE_APP_ENV || 'production'),
@@ -35,7 +34,6 @@ export default defineConfig({
         manualChunks: {
           'react-vendor': ['react', 'react-dom'],
           'editor': ['react-quill-new'],
-          'auth': ['@clerk/clerk-react'],
           'supabase': ['@supabase/supabase-js']
         }
       }
