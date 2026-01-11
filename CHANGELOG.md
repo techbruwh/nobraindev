@@ -10,6 +10,18 @@ All notable changes to this project will be documented in this file.
 ### 🔧 Chores
 -  bump version to 1.3.0
 -  bump version to 1.3.0
+-  bump version to 1.3.0
+
+
+
+## [1.3.0] - 2026-01-11
+
+### ✨ Features
+-  add clipboard manager
+
+### 🔧 Chores
+-  bump version to 1.3.0
+-  bump version to 1.3.0
 
 
 
