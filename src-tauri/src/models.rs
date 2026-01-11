@@ -28,3 +28,12 @@ pub struct ModelInfo {
     pub loaded: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClipboardEntry {
+    pub id: Option<i64>,
+    pub content: String,
+    pub source: String,
+    pub category: String,
+    pub created_at: String,
+}
+

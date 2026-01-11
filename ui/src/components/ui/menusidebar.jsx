@@ -1,8 +1,9 @@
-import { FileCode, MessageSquare, User } from 'lucide-react'
+import { FileCode, User, Clipboard } from 'lucide-react'
 
 export function MenuSidebar({ activeMenu, onMenuChange, sidebarCollapsed }) {
   const menuItems = [
     { id: 'snippets', icon: FileCode, label: 'Snippets', badge: null },
+    { id: 'clipboard', icon: Clipboard, label: 'Clipboard', badge: null },
     { id: 'account', icon: User, label: 'Account', badge: 'DEV' }
   ]
 

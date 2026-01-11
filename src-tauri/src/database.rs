@@ -74,6 +74,24 @@ impl Database {
             [],
         )?;
 
+        // Create clipboard history table
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS clipboard_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                content TEXT NOT NULL,
+                source TEXT NOT NULL,
+                category TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )",
+            [],
+        )?;
+
+        // Create index for clipboard history
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_clipboard_created ON clipboard_history(created_at DESC)",
+            [],
+        )?;
+
         Ok(())
     }
 
@@ -250,6 +268,76 @@ impl Database {
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(embeddings)
+    }
+
+    // Clipboard history methods
+    pub fn save_clipboard_entry(&self, content: &str, source: &str, category: &str, created_at: &str) -> Result<i64> {
+        self.conn.execute(
+            "INSERT INTO clipboard_history (content, source, category, created_at)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![content, source, category, created_at],
+        )?;
+
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    pub fn get_clipboard_history(&self, limit: i64) -> Result<Vec<crate::models::ClipboardEntry>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, content, source, category, created_at
+             FROM clipboard_history
+             ORDER BY created_at DESC
+             LIMIT ?1"
+        )?;
+
+        let entries = stmt.query_map(params![limit], |row| {
+            Ok(crate::models::ClipboardEntry {
+                id: Some(row.get(0)?),
+                content: row.get(1)?,
+                source: row.get(2)?,
+                category: row.get(3)?,
+                created_at: row.get(4)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(entries)
+    }
+
+    pub fn get_clipboard_entry(&self, id: i64) -> Result<Option<crate::models::ClipboardEntry>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, content, source, category, created_at
+             FROM clipboard_history WHERE id = ?1"
+        )?;
+
+        let entry = stmt.query_row(params![id], |row| {
+            Ok(crate::models::ClipboardEntry {
+                id: Some(row.get(0)?),
+                content: row.get(1)?,
+                source: row.get(2)?,
+                category: row.get(3)?,
+                created_at: row.get(4)?,
+            })
+        }).optional()?;
+
+        Ok(entry)
+    }
+
+    pub fn delete_clipboard_entry(&self, id: i64) -> Result<()> {
+        self.conn.execute(
+            "DELETE FROM clipboard_history WHERE id = ?1",
+            params![id],
+        )?;
+
+        Ok(())
+    }
+
+    pub fn clear_clipboard_history(&self) -> Result<()> {
+        self.conn.execute(
+            "DELETE FROM clipboard_history",
+            [],
+        )?;
+
+        Ok(())
     }
 }
 

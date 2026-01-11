@@ -12,6 +12,7 @@ import { ConfirmDialog } from '@/components/ui/confirmdialog'
 import { MenuSidebar } from '@/components/ui/menusidebar'
 import { SnippetsPanel } from '@/components/ui/snippetspanel'
 import { AccountPanel } from '@/components/ui/accountpanel'
+import { ClipboardPanel } from '@/components/ui/clipboardpanel'
 const ReactQuill = lazy(() => import('react-quill-new'))
 import 'react-quill-new/dist/quill.snow.css'
 import './editor.css'
@@ -652,6 +653,19 @@ function App() {
             />
           )}
           
+          {activeMenu === 'clipboard' && (
+            <ClipboardPanel 
+              onConvertToSnippet={() => {
+                setActiveMenu('snippets')
+                loadSnippets()
+                setHasUnsyncedChanges(true)
+              }}
+              onClipboardChanged={() => {
+                setHasUnsyncedChanges(true)
+              }}
+            />
+          )}
+
           {activeMenu === 'account' && (
             <AccountPanel 
               hasUnsyncedChanges={hasUnsyncedChanges}

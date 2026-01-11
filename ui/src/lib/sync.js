@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabase'
 import { invoke } from '@tauri-apps/api/core'
+import { clipboardService } from './clipboard'
 
 /**
  * Sync service for syncing local SQLite database with Supabase
@@ -254,20 +255,30 @@ export class SyncService {
     try {
       console.log('Starting sync for:', userEmail)
 
-      // First push local changes
+      // First push local changes (snippets)
       const pushResult = await this.pushToCloud(userEmail)
       console.log('Push result:', pushResult)
 
-      // Then pull cloud changes
+      // Then pull cloud changes (snippets)
       const pullResult = await this.pullFromCloud(userEmail)
       console.log('Pull result:', pullResult)
+
+      // Sync clipboard history
+      let clipboardSyncResult = { pushed: 0, updated: 0, pulled: 0, errors: 0 }
+      try {
+        clipboardSyncResult = await clipboardService.syncAll(userEmail)
+        console.log('Clipboard sync result:', clipboardSyncResult)
+      } catch (error) {
+        console.warn('Clipboard sync failed:', error)
+        // Don't fail the entire sync if clipboard sync fails
+      }
 
       this.lastSyncTime = new Date()
 
       return {
-        pushed: pushResult.pushed,
-        pulled: pullResult.pulled,
-        errors: pushResult.errors + pullResult.errors,
+        pushed: pushResult.pushed + (clipboardSyncResult.pushed || 0),
+        pulled: pullResult.pulled + (clipboardSyncResult.pulled || 0),
+        errors: pushResult.errors + pullResult.errors + (clipboardSyncResult.errors || 0),
         syncTime: this.lastSyncTime
       }
     } catch (error) {

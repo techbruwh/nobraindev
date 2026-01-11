@@ -221,3 +221,52 @@ pub async fn regenerate_embeddings(state: State<'_, AppState>) -> Result<String,
 
     Ok(format!("Regenerated {} embeddings", count))
 }
+
+// Clipboard management commands
+
+#[tauri::command]
+pub fn read_system_clipboard() -> Result<String, String> {
+    let mut clipboard = arboard::Clipboard::new()
+        .map_err(|e| format!("Failed to access clipboard: {}", e))?;
+    
+    clipboard.get_text()
+        .map_err(|e| format!("Failed to read clipboard: {}", e))
+}
+
+#[tauri::command]
+pub fn save_clipboard_entry(
+    state: State<AppState>,
+    content: String,
+    source: String,
+    category: String,
+    created_at: Option<String>,
+) -> Result<i64, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let timestamp = created_at.unwrap_or_else(|| chrono::Utc::now().to_rfc3339());
+    db.save_clipboard_entry(&content, &source, &category, &timestamp)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_clipboard_history(state: State<AppState>, limit: i64) -> Result<Vec<crate::models::ClipboardEntry>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.get_clipboard_history(limit).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_clipboard_entry(state: State<AppState>, id: i64) -> Result<Option<crate::models::ClipboardEntry>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.get_clipboard_entry(id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_clipboard_entry(state: State<AppState>, id: i64) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.delete_clipboard_entry(id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn clear_clipboard_history(state: State<AppState>) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.clear_clipboard_history().map_err(|e| e.to_string())
+}
