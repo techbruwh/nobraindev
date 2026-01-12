@@ -206,6 +206,34 @@ export class SyncService {
   }
 
   /**
+   * Delete snippet from cloud by local_id
+   */
+  async deleteFromCloud(userEmail, localId) {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase not configured')
+    }
+
+    if (!userEmail) {
+      throw new Error('User email required for deletion')
+    }
+
+    try {
+      const { error } = await supabase
+        .from('snippets')
+        .delete()
+        .eq('user_email', userEmail)
+        .eq('local_id', localId)
+
+      if (error) throw error
+
+      return { deleted: true, timestamp: new Date() }
+    } catch (error) {
+      console.error(`Failed to delete snippet ${localId} from cloud:`, error)
+      throw error
+    }
+  }
+
+  /**
    * Request sync approval
    */
   async requestSyncApproval(userEmail) {

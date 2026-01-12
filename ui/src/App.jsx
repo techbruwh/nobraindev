@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { Plus, Search, FileCode, X, Edit, Trash2, Copy, Save, Brain, Download, Sparkles, CheckCircle, AlertCircle, Info, PanelLeftClose, PanelLeft, Keyboard, Code, Braces, RefreshCw, Cloud, User } from 'lucide-react'
 import { useSupabaseAuth } from '@/lib/supabase-auth'
+import { syncService } from '@/lib/sync'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -75,6 +76,10 @@ function App() {
   const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(false)
   const [lastSyncTime, setLastSyncTime] = useState(null)
   const [isSyncingFromFooter, setIsSyncingFromFooter] = useState(false)
+
+  // Deletion tracking state
+  const [isDeletingSnippet, setIsDeletingSnippet] = useState(false)
+  const [deleteError, setDeleteError] = useState(null)
 
   // Detect OS
   useEffect(() => {
@@ -525,11 +530,27 @@ function App() {
     setConfirmDialog({
       isOpen: true,
       title: 'Delete Snippet',
-      message: `Are you sure you want to delete "${snippet.title}"? This action cannot be undone.`,
+      message: `Are you sure you want to delete "${snippet.title}"? This will be deleted from both local and cloud storage.`,
       onConfirm: async () => {
+        setIsDeletingSnippet(true)
+        setDeleteError(null)
         try {
+          // Delete locally first
           await invoke('delete_snippet', { id: snippet.id })
-          showToast('Snippet deleted successfully', 'success')
+          
+          // Delete from cloud if user is signed in
+          if (isSignedIn && user?.email) {
+            try {
+              await syncService.deleteFromCloud(user.email, snippet.id)
+              showToast('Snippet deleted from local and cloud', 'success')
+            } catch (cloudError) {
+              console.warn('Failed to delete from cloud:', cloudError)
+              setDeleteError('Deleted locally but failed to sync deletion to cloud')
+              showToast('Deleted locally (cloud sync failed)', 'warning')
+            }
+          } else {
+            showToast('Snippet deleted locally', 'success')
+          }
           
           // Mark as having unsynced changes
           setHasUnsyncedChanges(true)
@@ -541,7 +562,10 @@ function App() {
           }
         } catch (error) {
           console.error('Failed to delete snippet:', error)
+          setDeleteError('Failed to delete snippet')
           showToast('Failed to delete snippet', 'error')
+        } finally {
+          setIsDeletingSnippet(false)
         }
       }
     })
@@ -649,7 +673,10 @@ function App() {
                 setIsEditing(false)
               }}
               onNewSnippet={handleNewSnippet}
+              onDeleteSnippet={handleDeleteSnippet}
               sidebarCollapsed={sidebarCollapsed}
+              isDeleting={isDeletingSnippet}
+              error={deleteError}
             />
           )}
           

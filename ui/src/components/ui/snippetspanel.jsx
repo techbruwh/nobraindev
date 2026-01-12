@@ -1,17 +1,21 @@
-import { Search, Plus, FileCode } from 'lucide-react'
+import { Search, Plus, FileCode, Trash2, Copy, AlertCircle, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 export function SnippetsPanel({ 
   snippets, 
   currentSnippet, 
   onSnippetClick, 
   onNewSnippet,
-  sidebarCollapsed 
+  onDeleteSnippet,
+  sidebarCollapsed,
+  isDeleting = false,
+  error = null
 }) {
   const snippetRefs = useRef({})
   const containerRef = useRef(null)
+  const [deletingId, setDeletingId] = useState(null)
 
   // Auto-scroll to selected snippet when it changes
   useEffect(() => {
@@ -23,67 +27,131 @@ export function SnippetsPanel({
     }
   }, [currentSnippet?.id])
 
+  const handleDeleteClick = (e, snippet) => {
+    e.stopPropagation()
+    if (confirm(`Are you sure you want to delete "${snippet.title}"? This will be deleted from both local and cloud storage.`)) {
+      setDeletingId(snippet.id)
+      onDeleteSnippet?.(snippet)
+      setDeletingId(null)
+    }
+  }
+
+  const handleCopySnippet = async (e, content) => {
+    e.stopPropagation()
+    try {
+      await navigator.clipboard.writeText(content)
+    } catch (err) {
+      console.error('Failed to copy:', err)
+    }
+  }
+
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col bg-background">
       {/* Header */}
-      <div className="p-2 border-b space-y-2">
-        <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <FileCode className="h-4 w-4 text-muted-foreground" />
-          <h1 className="text-sm font-semibold">Snippets</h1>
-          <Badge variant="secondary">{snippets.length}</Badge>
-        </div>
-          <Button onClick={onNewSnippet} size="sm">
-            <Plus className="h-3.5 w-3.5" />New
-          </Button>
+      <div className="p-3 border-b">
+        <div className="flex items-center gap-2">
+          <FileCode className="h-4 w-4" />
+          <h2 className="text-sm font-semibold">Snippets</h2>
+          <Badge variant="secondary" className="text-[9px]">
+            {snippets.length}
+          </Badge>
         </div>
       </div>
 
-      {/* Snippets List */}
-      <div ref={containerRef} className="flex-1 overflow-y-auto p-1 space-y-1">
-        {snippets.map((snippet) => (
-          <button
-            key={snippet.id}
-            ref={(el) => snippetRefs.current[snippet.id] = el}
-            className={`w-full p-2 rounded-md transition-colors text-left group border ${
-              currentSnippet?.id === snippet.id 
-                ? 'bg-accent border-primary' 
-                : 'border-border/50 hover:bg-accent hover:border-border'
-            }`}
-            onClick={() => onSnippetClick(snippet)}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <h3 className={`text-[10px] font-medium truncate transition-colors ${
-                    currentSnippet?.id === snippet.id ? 'text-primary' : 'group-hover:text-primary'
-                  }`}>
-                    {snippet.title}
-                  </h3>
-                  <Badge variant="secondary" className="shrink-0">
-                    {snippet.language}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground">
-                  <span>{new Date(snippet.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                  {snippet.tags && (
-                    <>
-                      <span>•</span>
-                      <span className="truncate">{snippet.tags.split(',')[0]}</span>
-                    </>
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        {error && (
+          <div className="p-2 bg-destructive/10 border border-destructive/20 rounded-md">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-3 w-3 text-destructive mt-0.5" />
+              <p className="text-[10px] text-destructive">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {isDeleting ? (
+          <div className="flex items-center justify-center py-8">
+            <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
+        ) : snippets.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p className="text-[10px]">No snippets yet</p>
+          </div>
+        ) : (
+          snippets.map((snippet) => (
+            <div
+              key={snippet.id}
+              ref={(el) => snippetRefs.current[snippet.id] = el}
+              onClick={() => onSnippetClick(snippet)}
+              className={`p-2 border rounded-md cursor-pointer transition-all ${
+                currentSnippet?.id === snippet.id 
+                  ? 'bg-accent border-primary/50 ring-1 ring-primary/20' 
+                  : 'bg-accent/30 border-border/50 hover:bg-accent/50 hover:border-border'
+              }`}
+            >
+              <div className="flex items-start gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <h3 className="text-[10px] font-medium truncate">
+                      {snippet.title}
+                    </h3>
+                    <Badge variant="secondary" className="shrink-0 text-[8px]">
+                      {snippet.language}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground mb-1">
+                    <span>{new Date(snippet.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                    {snippet.tags && (
+                      <>
+                        <span>•</span>
+                        <span className="truncate">{snippet.tags.split(',')[0]}</span>
+                      </>
+                    )}
+                  </div>
+                  {snippet.content && (
+                    <p className="text-[9px] text-muted-foreground line-clamp-2 font-mono">
+                      {snippet.content}
+                    </p>
                   )}
                 </div>
               </div>
+
+              {/* Actions */}
+              <div className="flex gap-1 mt-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-[9px]"
+                  onClick={(e) => handleCopySnippet(e, snippet.content)}
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-[9px] text-destructive hover:text-destructive"
+                  onClick={(e) => handleDeleteClick(e, snippet)}
+                  disabled={deletingId === snippet.id || isDeleting}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
             </div>
-          </button>
-        ))}
-        
-        {snippets.length === 0 && (
-          <div className="text-center py-6 text-muted-foreground">
-            <Search className="h-6 w-6 mx-auto mb-2 opacity-50" />
-            <p className="text-[10px]">No snippets found</p>
-          </div>
+          ))
         )}
+      </div>
+
+      {/* Footer Actions */}
+      <div className="p-3 border-t">
+        <Button
+          className="w-full text-[10px] h-8"
+          onClick={onNewSnippet}
+          disabled={isDeleting}
+        >
+          <Plus className="h-3.5 w-3.5 mr-1" />
+          New Snippet
+        </Button>
       </div>
     </div>
   )
