@@ -91,10 +91,17 @@ export function ClipboardPanel({ onConvertToSnippet, onClipboardChanged, hasUnsy
         // Trigger sync button enable
         onClipboardChanged?.()
       } else {
-        setError(result.message)
+        // Show helpful message based on the result
+        if (result.message === 'Clipboard is empty') {
+          setError('Your clipboard is empty. Copy some text first, then click "Scan & Refresh".')
+        } else if (result.message === 'Already saved') {
+          setError('This content is already in your history. Copy something new to add it.')
+        } else {
+          setError(result.message)
+        }
       }
     } catch (err) {
-      setError(err.message || 'Failed to scan clipboard')
+      setError(err.message || 'Failed to scan clipboard. Make sure the app has clipboard access permissions.')
       console.error(err)
     } finally {
       setIsLoading(false)
@@ -256,7 +263,7 @@ export function ClipboardPanel({ onConvertToSnippet, onClipboardChanged, hasUnsy
       setLastSyncTime(result.syncTime)
       
       // Notify parent that sync completed successfully
-      onClipboardSyncComplete?.()
+      onClipboardSyncComplete?.(result.syncTime)
       
       // Clear success message after 3 seconds
       setTimeout(() => setSyncStatus(null), 3000)

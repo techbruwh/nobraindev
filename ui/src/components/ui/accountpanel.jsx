@@ -200,6 +200,37 @@ export function AccountPanel({
               </p>
             </div>
 
+            {/* Security Features */}
+            <div className="p-3 bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-lg space-y-2">
+              <div className="flex items-center gap-2 mb-2">
+                <Shield className="h-4 w-4 text-blue-600" />
+                <h3 className="text-[11px] font-semibold text-blue-600">Secure Cloud Storage</h3>
+              </div>
+              
+              <div className="space-y-1.5">
+                <div className="flex items-start gap-2">
+                  <ShieldCheck className="h-3 w-3 text-green-600 mt-0.5 shrink-0" />
+                  <p className="text-[9px] text-foreground/80">
+                    <span className="font-medium">Row-Level Security:</span> Only you can access your data via JWT authentication, even database admins cannot read it
+                  </p>
+                </div>
+                
+                <div className="flex items-start gap-2">
+                  <ShieldCheck className="h-3 w-3 text-green-600 mt-0.5 shrink-0" />
+                  <p className="text-[9px] text-foreground/80">
+                    <span className="font-medium">Encryption at Rest:</span> Data encrypted with user-specific keys
+                  </p>
+                </div>
+                
+                <div className="flex items-start gap-2">
+                  <ShieldCheck className="h-3 w-3 text-green-600 mt-0.5 shrink-0" />
+                  <p className="text-[9px] text-foreground/80">
+                    <span className="font-medium">Encryption in Transit:</span> HTTPS/TLS for all data transmission
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {!isSupabaseConfigured() && (
               <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-md mb-3">
                 <p className="text-[10px] text-amber-600">
@@ -329,7 +360,7 @@ export function AccountPanel({
                         <Shield className="h-3.5 w-3.5 text-green-600" />
                         <div className="flex-1">
                           <p className="text-[10px] font-semibold text-green-600">
-                            End-to-End Encryption Enabled
+                            Secure Cloud Encryption Enabled
                           </p>
                           <p className="text-[9px] text-green-600/80">
                             Your data are securely encrypted in the cloud

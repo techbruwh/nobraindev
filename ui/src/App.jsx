@@ -691,7 +691,7 @@ function App() {
           )}
           
           {activeMenu === 'clipboard' && (
-            <ClipboardPanel 
+            <ClipboardPanel
               onConvertToSnippet={() => {
                 setActiveMenu('snippets')
                 loadSnippets()
@@ -701,8 +701,9 @@ function App() {
                 setHasUnsyncedClipboard(true)
               }}
               hasUnsyncedClipboard={hasUnsyncedClipboard}
-              onClipboardSyncComplete={() => {
+              onClipboardSyncComplete={(syncTime) => {
                 setHasUnsyncedClipboard(false)
+                setLastSyncTime(syncTime)
               }}
             />
           )}
@@ -948,12 +949,14 @@ function App() {
         </p>
         
         <div className="flex items-center gap-2">
-          {lastSyncTime && (
-            <span className="text-[9px] text-muted-foreground flex items-center gap-1">
-              <Cloud className="h-3 w-3" />
-              Last synced: {lastSyncTime.toLocaleTimeString()}
-            </span>
-          )}
+          <span className="text-[9px] text-muted-foreground flex items-center gap-1">
+            <Cloud className="h-3 w-3" />
+            {lastSyncTime ? (
+              <>Last synced: {lastSyncTime.toLocaleTimeString()}</>
+            ) : (
+              <>Not synced yet</>
+            )}
+          </span>
         </div>
       </div>
 
