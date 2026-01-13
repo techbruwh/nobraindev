@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
-import { Clipboard, Trash2, Copy, FileCode, Search, RefreshCw, AlertCircle } from 'lucide-react'
+import { Clipboard, Trash2, Copy, FileCode, Search, RefreshCw, AlertCircle, Cloud, CheckCircle, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { clipboardService } from '@/lib/clipboard'
 import { useSupabaseAuth } from '@/lib/supabase-auth'
+import { syncService } from '@/lib/sync'
 
-export function ClipboardPanel({ onConvertToSnippet, onClipboardChanged }) {
+export function ClipboardPanel({ onConvertToSnippet, onClipboardChanged, hasUnsyncedClipboard, onClipboardSyncComplete }) {
   const { user } = useSupabaseAuth()
+  const isSignedIn = !!user
   const [history, setHistory] = useState([])
   const [filteredHistory, setFilteredHistory] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
@@ -20,6 +22,12 @@ export function ClipboardPanel({ onConvertToSnippet, onClipboardChanged }) {
     language: 'text',
     tags: '',
   })
+  
+  // Sync state
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [syncStatus, setSyncStatus] = useState(null)
+  const [lastSyncTime, setLastSyncTime] = useState(null)
+  const [syncApproval, setSyncApproval] = useState(null)
 
   // Load clipboard history on mount
   useEffect(() => {
@@ -28,6 +36,22 @@ export function ClipboardPanel({ onConvertToSnippet, onClipboardChanged }) {
     const interval = setInterval(loadClipboardHistory, 30000)
     return () => clearInterval(interval)
   }, [])
+
+  // Check sync approval on mount
+  useEffect(() => {
+    if (isSignedIn && user?.email) {
+      checkSyncApproval()
+    }
+  }, [isSignedIn, user])
+
+  const checkSyncApproval = async () => {
+    try {
+      const approval = await syncService.checkSyncApproval(user.email)
+      setSyncApproval(approval)
+    } catch (error) {
+      console.error('Failed to check sync approval:', error)
+    }
+  }
 
   // Filter history based on search query
   useEffect(() => {
@@ -78,12 +102,38 @@ export function ClipboardPanel({ onConvertToSnippet, onClipboardChanged }) {
   }
 
   const handleDeleteEntry = async (entryId) => {
+    if (!confirm('Are you sure you want to delete this clipboard entry? This will be deleted from both local and cloud storage.')) {
+      return
+    }
+
+    setIsLoading(true)
+    setError(null)
+
     try {
+      // Delete locally first
       await clipboardService.deleteClipboardEntry(entryId)
+      
+      // Delete from cloud if user is signed in
+      if (isSignedIn && user?.email && syncApproval?.approved) {
+        try {
+          const { syncService } = await import('@/lib/sync')
+          await syncService.deleteClipboardFromCloud(user.email, entryId)
+        } catch (cloudError) {
+          console.warn('Failed to delete from cloud:', cloudError)
+          setError('Deleted locally but failed to sync deletion to cloud')
+        }
+      }
+      
+      // Mark as having unsynced changes
+      onClipboardChanged?.()
+      
+      // Remove from UI
       setHistory(history.filter(e => e.id !== entryId))
     } catch (err) {
       setError('Failed to delete entry')
       console.error(err)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -128,15 +178,116 @@ export function ClipboardPanel({ onConvertToSnippet, onClipboardChanged }) {
   }
 
   const handleClearAll = async () => {
-    if (confirm('Are you sure you want to clear all clipboard history?')) {
-      try {
-        await clipboardService.clearClipboardHistory()
-        setHistory([])
-        setFilteredHistory([])
-      } catch (err) {
-        setError('Failed to clear history')
-        console.error(err)
+    if (!confirm('Are you sure you want to clear all clipboard history? This will be deleted from both local and cloud storage.')) {
+      return
+    }
+
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      // Clear local storage first
+      await clipboardService.clearClipboardHistory()
+      
+      // Clear from cloud if user is signed in
+      if (isSignedIn && user?.email && syncApproval?.approved) {
+        try {
+          const { supabase } = await import('@/lib/supabase')
+          const { error } = await supabase
+            .from('clipboard_history')
+            .delete()
+            .eq('user_email', user.email)
+          
+          if (error) throw error
+        } catch (cloudError) {
+          console.warn('Failed to clear from cloud:', cloudError)
+          setError('Cleared locally but failed to sync deletion to cloud')
+        }
       }
+      
+      // Mark as having unsynced changes
+      onClipboardChanged?.()
+      
+      // Clear UI
+      setHistory([])
+      setFilteredHistory([])
+    } catch (err) {
+      setError('Failed to clear history')
+      console.error(err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSync = async () => {
+    const email = user?.email
+    if (!email) {
+      setError('User email not found')
+      return
+    }
+
+    // If no unsynced changes, show message without calling API
+    if (!hasUnsyncedClipboard) {
+      setSyncStatus({
+        type: 'success',
+        message: '🔒 Secured cloud sync successful'
+      })
+      setTimeout(() => setSyncStatus(null), 3000)
+      return
+    }
+
+    setIsSyncing(true)
+    setError(null)
+    setSyncStatus(null)
+
+    try {
+      const result = await clipboardService.syncAll(email)
+      
+      // Reload clipboard after sync
+      await loadClipboardHistory()
+      
+      // Create user-friendly message
+      let message
+      if (result.pushed === 0 && result.pulled === 0 && result.updated === 0) {
+        message = '🔒 Secured cloud sync successful'
+      } else {
+        message = '🔒 Secured cloud sync successful'
+      }
+      
+      setSyncStatus({
+        type: 'success',
+        message
+      })
+      setLastSyncTime(result.syncTime)
+      
+      // Notify parent that sync completed successfully
+      onClipboardSyncComplete?.()
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSyncStatus(null), 3000)
+    } catch (error) {
+      console.error('Clipboard sync failed:', error)
+      
+      let errorMessage
+      if (error.message === 'SYNC_NOT_APPROVED') {
+        errorMessage = 'Sync access not approved yet. Please wait for approval.'
+      } else if (error.message === 'Supabase not configured') {
+        errorMessage = 'Cloud sync not configured'
+      } else if (error.message.includes('fetch') || error.message.includes('network')) {
+        errorMessage = 'Network error. Check your internet connection.'
+      } else {
+        errorMessage = error.message || 'Sync failed. Please try again.'
+      }
+      
+      setSyncStatus({
+        type: 'error',
+        message: errorMessage
+      })
+      
+      // Clear error message after 5 seconds
+      setTimeout(() => setSyncStatus(null), 5000)
+    } finally {
+      setIsSyncing(false)
     }
   }
 
@@ -150,6 +301,24 @@ export function ClipboardPanel({ onConvertToSnippet, onClipboardChanged }) {
           <Badge variant="secondary" className="text-[9px]">
             {history.length}
           </Badge>
+          
+          {/* Sync Button */}
+          {isSignedIn && syncApproval?.approved && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-auto h-7 px-2 text-[9px] gap-1"
+              disabled={!hasUnsyncedClipboard || isSyncing}
+              onClick={handleSync}
+            >
+              {isSyncing ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Cloud className="h-3 w-3" />
+              )}
+              {isSyncing ? 'Syncing...' : hasUnsyncedClipboard ? 'Sync' : 'Synced'}
+            </Button>
+          )}
         </div>
 
         {/* Search */}
@@ -167,6 +336,28 @@ export function ClipboardPanel({ onConvertToSnippet, onClipboardChanged }) {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        {/* Sync Status */}
+        {syncStatus && (
+          <div className={`p-2 rounded-md border ${
+            syncStatus.type === 'success' 
+              ? 'bg-green-500/10 border-green-500/20' 
+              : 'bg-destructive/10 border-destructive/20'
+          }`}>
+            <div className="flex items-center gap-2">
+              {syncStatus.type === 'success' ? (
+                <CheckCircle className="h-3 w-3 text-green-500" />
+              ) : (
+                <AlertCircle className="h-3 w-3 text-destructive" />
+              )}
+              <p className={`text-[10px] ${
+                syncStatus.type === 'success' ? 'text-green-600' : 'text-destructive'
+              }`}>
+                {syncStatus.message}
+              </p>
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="p-2 bg-destructive/10 border border-destructive/20 rounded-md">
             <div className="flex items-start gap-2">

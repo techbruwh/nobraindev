@@ -3,6 +3,8 @@ applyTo: '**'
 ---
 # UI Component Guide
 
+Do not create MD files!
+
 ## Tech Stack 
 - **React** + **Vite**
 - **Tailwind CSS** with CSS variable-based theme tokens (`ui/tailwind.config.js`)

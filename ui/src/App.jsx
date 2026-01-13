@@ -77,6 +77,9 @@ function App() {
   const [lastSyncTime, setLastSyncTime] = useState(null)
   const [isSyncingFromFooter, setIsSyncingFromFooter] = useState(false)
 
+  // Track if clipboard has been modified
+  const [hasUnsyncedClipboard, setHasUnsyncedClipboard] = useState(false)
+
   // Deletion tracking state
   const [isDeletingSnippet, setIsDeletingSnippet] = useState(false)
   const [deleteError, setDeleteError] = useState(null)
@@ -688,7 +691,11 @@ function App() {
                 setHasUnsyncedChanges(true)
               }}
               onClipboardChanged={() => {
-                setHasUnsyncedChanges(true)
+                setHasUnsyncedClipboard(true)
+              }}
+              hasUnsyncedClipboard={hasUnsyncedClipboard}
+              onClipboardSyncComplete={() => {
+                setHasUnsyncedClipboard(false)
               }}
             />
           )}

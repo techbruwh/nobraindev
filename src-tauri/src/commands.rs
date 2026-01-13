@@ -270,3 +270,17 @@ pub fn clear_clipboard_history(state: State<AppState>) -> Result<(), String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     db.clear_clipboard_history().map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub fn update_clipboard_entry(
+    state: State<AppState>,
+    id: i64,
+    content: String,
+    source: String,
+    category: String,
+    updated_at: String,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.update_clipboard_entry(id, &content, &source, &category, &updated_at)
+        .map_err(|e| e.to_string())
+}

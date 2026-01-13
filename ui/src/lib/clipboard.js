@@ -121,81 +121,9 @@ export class ClipboardService {
     if (!isSupabaseConfigured()) {
       throw new Error('Supabase not configured')
     }
-
-    if (!userEmail) {
-      throw new Error('User email required for sync')
-    }
-
-    try {
-      // Get all local clipboard entries
-      const localEntries = await this.getClipboardHistory(this.maxHistory)
-
-      if (!localEntries || localEntries.length === 0) {
-        console.log('No local clipboard entries to sync')
-        return { pushed: 0, updated: 0, errors: 0 }
-      }
-
-      let pushed = 0
-      let updated = 0
-      let errors = 0
-
-      // Push each entry to Supabase
-      for (const entry of localEntries) {
-        try {
-          // Check if entry already exists in cloud
-          const { data: existing, error: fetchError } = await supabase
-            .from('clipboard_history')
-            .select('id, updated_at')
-            .eq('user_email', userEmail)
-            .eq('local_id', entry.id)
-            .single()
-
-          if (fetchError && fetchError.code !== 'PGRST116') {
-            throw fetchError
-          }
-
-          if (existing) {
-            // Update existing entry
-            const { error: updateError } = await supabase
-              .from('clipboard_history')
-              .update({
-                content: entry.content,
-                source: entry.source,
-                category: entry.category,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', existing.id)
-
-            if (updateError) throw updateError
-            updated++
-          } else {
-            // Insert new entry
-            const { error: insertError } = await supabase
-              .from('clipboard_history')
-              .insert({
-                user_email: userEmail,
-                local_id: entry.id,
-                content: entry.content,
-                source: entry.source,
-                category: entry.category,
-                created_at: entry.created_at,
-              })
-
-            if (insertError) throw insertError
-            pushed++
-          }
-        } catch (error) {
-          console.error(`Failed to sync clipboard entry ${entry.id}:`, error)
-          errors++
-        }
-      }
-
-      this.lastSyncTime = new Date()
-      return { pushed, updated, errors }
-    } catch (error) {
-      console.error('Sync failed:', error)
-      throw error
-    }
+    
+    const { syncService } = await import('./sync')
+    return await syncService.pushClipboardToCloud(userEmail)
   }
 
   /**
@@ -205,71 +133,23 @@ export class ClipboardService {
     if (!isSupabaseConfigured()) {
       throw new Error('Supabase not configured')
     }
-
-    if (!userEmail) {
-      throw new Error('User email required for sync')
-    }
-
-    try {
-      // Get all cloud entries
-      const { data: cloudEntries, error } = await supabase
-        .from('clipboard_history')
-        .select('*')
-        .eq('user_email', userEmail)
-        .order('created_at', { ascending: false })
-        .limit(this.maxHistory)
-
-      if (error) throw error
-
-      let pulled = 0
-      let errors = 0
-
-      // Merge cloud entries with local (cloud takes precedence if newer)
-      for (const entry of cloudEntries || []) {
-        try {
-          // Check if entry exists locally
-          const localEntries = await invoke('get_clipboard_entry', { id: entry.local_id })
-
-          if (!localEntries) {
-            // Insert new entry locally
-            await this.saveClipboardEntry(entry.content, {
-              source: entry.source,
-              category: entry.category,
-            })
-            pulled++
-          }
-        } catch (error) {
-          console.error(`Failed to pull clipboard entry ${entry.id}:`, error)
-          errors++
-        }
-      }
-
-      return { pulled, errors }
-    } catch (error) {
-      console.error('Pull from cloud failed:', error)
-      throw error
-    }
+    
+    const { syncService } = await import('./sync')
+    return await syncService.pullClipboardFromCloud(userEmail)
   }
 
   /**
    * Full sync: push and pull
    */
   async syncAll(userEmail) {
-    try {
-      const pushResult = await this.syncToCloud(userEmail)
-      const pullResult = await this.pullFromCloud(userEmail)
-
-      return {
-        pushed: pushResult.pushed,
-        updated: pushResult.updated,
-        pulled: pullResult.pulled,
-        errors: pushResult.errors + pullResult.errors,
-        syncTime: this.lastSyncTime,
-      }
-    } catch (error) {
-      console.error('Full sync failed:', error)
-      throw error
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase not configured')
     }
+    
+    const { syncService } = await import('./sync')
+    const result = await syncService.syncClipboardAll(userEmail)
+    this.lastSyncTime = result.syncTime
+    return result
   }
 
   /**

@@ -1,6 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase'
 import { invoke } from '@tauri-apps/api/core'
-import { clipboardService } from './clipboard'
 
 /**
  * Sync service for syncing local SQLite database with Supabase
@@ -291,22 +290,12 @@ export class SyncService {
       const pullResult = await this.pullFromCloud(userEmail)
       console.log('Pull result:', pullResult)
 
-      // Sync clipboard history
-      let clipboardSyncResult = { pushed: 0, updated: 0, pulled: 0, errors: 0 }
-      try {
-        clipboardSyncResult = await clipboardService.syncAll(userEmail)
-        console.log('Clipboard sync result:', clipboardSyncResult)
-      } catch (error) {
-        console.warn('Clipboard sync failed:', error)
-        // Don't fail the entire sync if clipboard sync fails
-      }
-
       this.lastSyncTime = new Date()
 
       return {
-        pushed: pushResult.pushed + (clipboardSyncResult.pushed || 0),
-        pulled: pullResult.pulled + (clipboardSyncResult.pulled || 0),
-        errors: pushResult.errors + pullResult.errors + (clipboardSyncResult.errors || 0),
+        pushed: pushResult.pushed,
+        pulled: pullResult.pulled,
+        errors: pushResult.errors + pullResult.errors,
         syncTime: this.lastSyncTime
       }
     } catch (error) {
@@ -314,6 +303,239 @@ export class SyncService {
       throw error
     } finally {
       this.isSyncing = false
+    }
+  }
+
+  /**
+   * Push local clipboard history to Supabase
+   */
+  async pushClipboardToCloud(userEmail) {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase not configured')
+    }
+
+    if (!userEmail) {
+      throw new Error('User email required for sync')
+    }
+
+    try {
+      // Get all local clipboard entries
+      const localClipboard = await invoke('get_clipboard_history', { limit: 1000 })
+
+      if (!localClipboard || localClipboard.length === 0) {
+        console.log('No local clipboard entries to sync')
+        return { pushed: 0, updated: 0, errors: 0 }
+      }
+
+      let pushed = 0
+      let updated = 0
+      let errors = 0
+
+      // Push each clipboard entry to Supabase
+      for (const entry of localClipboard) {
+        try {
+          // Check if entry already exists in cloud
+          const { data: existing, error: fetchError } = await supabase
+            .from('clipboard_history')
+            .select('id, updated_at')
+            .eq('user_email', userEmail)
+            .eq('local_id', entry.id)
+            .single()
+
+          if (fetchError && fetchError.code !== 'PGRST116') {
+            throw fetchError
+          }
+
+          const cloudEntry = {
+            user_email: userEmail,
+            local_id: entry.id,
+            content: entry.content,
+            source: entry.source || 'system',
+            category: entry.category || 'general',
+            created_at: entry.created_at,
+            updated_at: entry.updated_at || entry.created_at
+          }
+
+          if (existing) {
+            // Update if local is newer
+            const localTime = new Date(entry.updated_at || entry.created_at).getTime()
+            const cloudTime = new Date(existing.updated_at).getTime()
+
+            if (localTime > cloudTime) {
+              // Don't include user_email in update to avoid RLS ambiguity
+              const updateData = {
+                content: entry.content,
+                source: entry.source || 'system',
+                category: entry.category || 'general',
+                updated_at: entry.updated_at || entry.created_at
+              }
+              
+              const { error } = await supabase
+                .from('clipboard_history')
+                .update(updateData)
+                .eq('id', existing.id)
+
+              if (error) throw error
+              updated++
+            }
+          } else {
+            // Insert new entry
+            const { error } = await supabase
+              .from('clipboard_history')
+              .insert(cloudEntry)
+
+            if (error) throw error
+            pushed++
+          }
+        } catch (error) {
+          console.error(`Failed to sync clipboard entry ${entry.id}:`, error)
+          errors++
+        }
+      }
+
+      return { pushed, updated, errors }
+    } catch (error) {
+      console.error('Push clipboard to cloud failed:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Pull clipboard history from Supabase to local SQLite
+   */
+  async pullClipboardFromCloud(userEmail) {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase not configured')
+    }
+
+    if (!userEmail) {
+      throw new Error('User email required for sync')
+    }
+
+    try {
+      // Get all cloud clipboard entries for this user
+      const { data: cloudEntries, error } = await supabase
+        .from('clipboard_history')
+        .select('*')
+        .eq('user_email', userEmail)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      if (!cloudEntries || cloudEntries.length === 0) {
+        console.log('No cloud clipboard entries to sync')
+        return { pulled: 0, errors: 0 }
+      }
+
+      let pulled = 0
+      let errors = 0
+
+      // Get all local clipboard entries to check for conflicts
+      const localEntries = await invoke('get_clipboard_history', { limit: 10000 })
+      const localMap = new Map(localEntries.map(e => [e.id, e]))
+
+      for (const cloudEntry of cloudEntries) {
+        try {
+          const localEntry = localMap.get(cloudEntry.local_id)
+
+          if (localEntry) {
+            // Check which is newer
+            const localTime = new Date(localEntry.updated_at || localEntry.created_at).getTime()
+            const cloudTime = new Date(cloudEntry.updated_at).getTime()
+
+            if (cloudTime > localTime) {
+              // Cloud is newer, update local
+              await invoke('update_clipboard_entry', {
+                id: cloudEntry.local_id,
+                content: cloudEntry.content,
+                source: cloudEntry.source || 'system',
+                category: cloudEntry.category || 'general',
+                updatedAt: cloudEntry.updated_at
+              })
+              pulled++
+            }
+          } else {
+            // New entry from cloud, create locally
+            await invoke('save_clipboard_entry', {
+              content: cloudEntry.content,
+              source: cloudEntry.source || 'system',
+              category: cloudEntry.category || 'general',
+              createdAt: cloudEntry.created_at
+            })
+            pulled++
+          }
+        } catch (error) {
+          console.error(`Failed to pull clipboard entry ${cloudEntry.id}:`, error)
+          errors++
+        }
+      }
+
+      return { pulled, errors }
+    } catch (error) {
+      console.error('Pull clipboard from cloud failed:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Full two-way sync for clipboard
+   */
+  async syncClipboardAll(userEmail) {
+    // Check approval first
+    const approval = await this.checkSyncApproval(userEmail)
+    if (!approval || !approval.approved) {
+      throw new Error('SYNC_NOT_APPROVED')
+    }
+
+    try {
+      console.log('Starting clipboard sync for:', userEmail)
+
+      // First push local changes
+      const pushResult = await this.pushClipboardToCloud(userEmail)
+      console.log('Clipboard push result:', pushResult)
+
+      // Then pull cloud changes
+      const pullResult = await this.pullClipboardFromCloud(userEmail)
+      console.log('Clipboard pull result:', pullResult)
+
+      return {
+        pushed: pushResult.pushed,
+        updated: pushResult.updated,
+        pulled: pullResult.pulled,
+        errors: pushResult.errors + pullResult.errors,
+        syncTime: new Date()
+      }
+    } catch (error) {
+      console.error('Clipboard sync failed:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Delete clipboard entry from cloud by local_id
+   */
+  async deleteClipboardFromCloud(userEmail, localId) {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase not configured')
+    }
+
+    if (!userEmail) {
+      throw new Error('User email required for deletion')
+    }
+
+    try {
+      const { error } = await supabase
+        .from('clipboard_history')
+        .delete()
+        .eq('user_email', userEmail)
+        .eq('local_id', localId)
+
+      if (error) throw error
+
+      return { deleted: true, timestamp: new Date() }
+    } catch (error) {
+      console.error(`Failed to delete clipboard entry ${localId} from cloud:`, error)
+      throw error
     }
   }
 

@@ -43,6 +43,7 @@ fn main() {
             commands::get_clipboard_entry,
             commands::delete_clipboard_entry,
             commands::clear_clipboard_history,
+            commands::update_clipboard_entry,
             auth::store_user_token,
             auth::get_user_token,
             auth::clear_user_tokens,

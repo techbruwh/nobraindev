@@ -339,5 +339,16 @@ impl Database {
 
         Ok(())
     }
+
+    pub fn update_clipboard_entry(&self, id: i64, content: &str, source: &str, category: &str, updated_at: &str) -> Result<()> {
+        self.conn.execute(
+            "UPDATE clipboard_history 
+             SET content = ?1, source = ?2, category = ?3, created_at = ?4
+             WHERE id = ?5",
+            params![content, source, category, updated_at, id],
+        )?;
+
+        Ok(())
+    }
 }
 
