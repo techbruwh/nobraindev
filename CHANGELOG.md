@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.2] - 2026-01-13
+
+### ✨ Features
+-  enhance sync functionality and UI updates across panels
+-  fix clipboard management feature
+-  implement snippet deletion with cloud sync support
+
+
+
 ## [1.3.1] - 2026-01-11
 
 ### 🔧 Chores
