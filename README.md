@@ -3,7 +3,7 @@
   
   # NoBrainDev
   
-  ### A powerful, tiny, AI-powered desktop application for managing snippets written in Rust.
+  ### A powerful, tiny, offline-first, AI-powered desktop application for managing notes and clipboard written in Rust.
   
   ![NoBrainDev](https://img.shields.io/badge/version-1.3.3-blue)
   ![License](https://img.shields.io/badge/license-MIT-green)
@@ -11,7 +11,7 @@
 </div>
 
 ## Features
-- **Organize Clipboard and Code Snippets** - Store and manage snippets.
+- **Organize snippets and clipboard** - Manage snippets and clipboard locally, (sync when you need).
 - **Smart Search** - Keyword-based search with filtering by title, tags, and content
 - **AI Semantic Search** - Natural language search powered by Small Language Models (SLM)
 - **Offline First** - Works perfectly without internet, sync when online
@@ -37,9 +37,9 @@ brew upgrade nobraindev
 
 ## Built With
 
-React • Rust • Tauri • SQLite • AI/ML
+React • Rust • Tauri • SQLite • AI/ML • Supabase
 
-## 🤝 Contributing
+## Contributing
 
 Want to contribute? 
 
@@ -51,11 +51,11 @@ cd nobraindev
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🐛 Issues?
+## Issues?
 
 [Open an issue](https://github.com/techbruwh/nobraindev/issues) and we'll help!
 
