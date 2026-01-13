@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.3] - 2026-01-13
+
+### ✨ Features
+-  improve clipboard error handling and enhance account panel security features
+
+
+
 ## [1.3.2] - 2026-01-13
 
 ### ✨ Features
