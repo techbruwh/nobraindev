@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Clipboard, Trash2, Copy, FileCode, Search, RefreshCw, AlertCircle, Cloud, CheckCircle, Loader2 } from 'lucide-react'
+import { Clipboard, Trash2, Copy, FileCode, Search, RefreshCw, AlertCircle, Cloud, CheckCircle, Loader2, ArrowUp, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -230,7 +230,7 @@ export function ClipboardPanel({ onConvertToSnippet, onClipboardChanged, hasUnsy
     if (!hasUnsyncedClipboard) {
       setSyncStatus({
         type: 'success',
-        message: '🔒 Secured cloud sync successful'
+        message: 'Secured cloud sync successful'
       })
       setTimeout(() => setSyncStatus(null), 3000)
       return
@@ -247,12 +247,7 @@ export function ClipboardPanel({ onConvertToSnippet, onClipboardChanged, hasUnsy
       await loadClipboardHistory()
       
       // Create user-friendly message
-      let message
-      if (result.pushed === 0 && result.pulled === 0 && result.updated === 0) {
-        message = '🔒 Secured cloud sync successful'
-      } else {
-        message = '🔒 Secured cloud sync successful'
-      }
+      const message = 'Secured cloud sync successful'
       
       setSyncStatus({
         type: 'success',
@@ -307,12 +302,18 @@ export function ClipboardPanel({ onConvertToSnippet, onClipboardChanged, hasUnsy
             <Button
               variant="ghost"
               size="sm"
-              className="ml-auto h-7 px-2 text-[9px] gap-1"
+              className={`ml-auto h-7 px-2 text-[9px] gap-1 ${
+                hasUnsyncedClipboard && !isSyncing 
+                  ? 'bg-yellow-500/20 text-yellow-600 hover:bg-yellow-500/30 hover:text-yellow-700' 
+                  : ''
+              }`}
               disabled={!hasUnsyncedClipboard || isSyncing}
               onClick={handleSync}
             >
               {isSyncing ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
+              ) : hasUnsyncedClipboard ? (
+                <ArrowUp className="h-3 w-3" />
               ) : (
                 <Cloud className="h-3 w-3" />
               )}
@@ -345,7 +346,7 @@ export function ClipboardPanel({ onConvertToSnippet, onClipboardChanged, hasUnsy
           }`}>
             <div className="flex items-center gap-2">
               {syncStatus.type === 'success' ? (
-                <CheckCircle className="h-3 w-3 text-green-500" />
+                <Shield className="h-3 w-3 text-green-500" />
               ) : (
                 <AlertCircle className="h-3 w-3 text-destructive" />
               )}

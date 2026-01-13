@@ -75,7 +75,6 @@ function App() {
   // Track if snippets have been modified
   const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(false)
   const [lastSyncTime, setLastSyncTime] = useState(null)
-  const [isSyncingFromFooter, setIsSyncingFromFooter] = useState(false)
 
   // Track if clipboard has been modified
   const [hasUnsyncedClipboard, setHasUnsyncedClipboard] = useState(false)
@@ -680,6 +679,14 @@ function App() {
               sidebarCollapsed={sidebarCollapsed}
               isDeleting={isDeletingSnippet}
               error={deleteError}
+              hasUnsyncedChanges={hasUnsyncedChanges}
+              onSyncComplete={(syncTime) => {
+                setHasUnsyncedChanges(false)
+                setLastSyncTime(syncTime)
+              }}
+              onSyncStart={() => {
+                // Optionally handle sync start
+              }}
             />
           )}
           
@@ -707,7 +714,6 @@ function App() {
               onSyncComplete={(syncTime) => {
                 setHasUnsyncedChanges(false)
                 setLastSyncTime(syncTime)
-                setIsSyncingFromFooter(false)
               }}
               onSyncStart={() => {
                 // Optionally handle sync start
@@ -947,36 +953,6 @@ function App() {
               <Cloud className="h-3 w-3" />
               Last synced: {lastSyncTime.toLocaleTimeString()}
             </span>
-          )}
-          {isSignedIn ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2 text-[10px] gap-1"
-              disabled={!hasUnsyncedChanges || isSyncingFromFooter}
-              onClick={() => {
-                setIsSyncingFromFooter(true)
-                // Trigger sync from footer
-                const event = new CustomEvent('footer-sync-clicked')
-                window.dispatchEvent(event)
-              }}
-            >
-              <RefreshCw className={`h-3 w-3 ${isSyncingFromFooter ? 'animate-spin' : ''}`} />
-              {isSyncingFromFooter ? 'Syncing...' : hasUnsyncedChanges ? 'Sync Now' : 'All Synced'}
-            </Button>
-          ) : (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2 text-[10px] gap-1 opacity-50 cursor-not-allowed"
-              disabled
-              title="Sign in to enable cloud sync"
-              onClick={() => setActiveMenu('account')}
-            >
-              <Cloud className="h-3 w-3" />
-              <span className="hidden sm:inline">Cloud Sync Disabled</span>
-              <span className="sm:hidden">Sync Off</span>
-            </Button>
           )}
         </div>
       </div>

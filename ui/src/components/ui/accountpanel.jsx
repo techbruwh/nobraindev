@@ -332,30 +332,11 @@ export function AccountPanel({
                             End-to-End Encryption Enabled
                           </p>
                           <p className="text-[9px] text-green-600/80">
-                            Your snippets are encrypted in the cloud
+                            Your data are securely encrypted in the cloud
                           </p>
                         </div>
                       </div>
                     </div>
-                  )}
-
-                  <Button 
-                    variant={hasUnsyncedChanges ? "default" : "secondary"}
-                    className="w-full justify-start gap-2" 
-                    size="sm"
-                    onClick={handleSync}
-                    disabled={isSyncing || !hasUnsyncedChanges}
-                  >
-                    <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                    <span className="text-xs">
-                      {isSyncing ? 'Syncing...' : hasUnsyncedChanges ? 'Sync Now' : 'All Synced'}
-                    </span>
-                  </Button>
-
-                  {lastSyncTime && (
-                    <p className="text-[9px] text-muted-foreground text-center">
-                      Last synced: {lastSyncTime.toLocaleTimeString()}
-                    </p>
                   )}
                 </>
               )}
