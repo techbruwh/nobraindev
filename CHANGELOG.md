@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.6] - 2026-01-14
+
+### 🔧 Chores
+-  enhance release script and UI component interactions for better user experience
+
+
+
 ## [1.3.5] - 2026-01-14
 
 ### ♻️ Refactoring
