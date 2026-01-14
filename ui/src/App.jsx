@@ -604,9 +604,9 @@ function App() {
               </div>
             </div>
           ) : isEditing ? (
-            // Editor Mode
+            // Editor Mode - Clean editor only for both new and edit
             <div className="flex-1 flex flex-col overflow-hidden">
-              {/* Editor Header */}
+              {/* Minimal Header */}
               <div className="border-b px-3 py-2 flex items-center justify-between bg-background">
                 <h2 className="text-sm font-semibold">
                   {currentSnippet ? 'Edit Snippet' : 'New Snippet'}
@@ -623,66 +623,22 @@ function App() {
                 </div>
               </div>
 
-              {/* Editor Form */}
-              <div className="flex-1 overflow-auto p-3">
-                <div className="max-w-4xl mx-auto space-y-2">
-                  <Input
-                    placeholder="Snippet title..."
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="text-sm font-medium"
-                  />
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <select
-                      value={language}
-                      onChange={(e) => setLanguage(e.target.value)}
-                      className="flex h-7 w-full rounded-md border border-border bg-background px-3 py-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-all"
-                    >
-                      <option value="javascript">JavaScript</option>
-                      <option value="typescript">TypeScript</option>
-                      <option value="python">Python</option>
-                      <option value="rust">Rust</option>
-                      <option value="go">Go</option>
-                      <option value="java">Java</option>
-                      <option value="cpp">C++</option>
-                      <option value="csharp">C#</option>
-                      <option value="php">PHP</option>
-                      <option value="ruby">Ruby</option>
-                      <option value="swift">Swift</option>
-                      <option value="kotlin">Kotlin</option>
-                      <option value="html">HTML</option>
-                      <option value="css">CSS</option>
-                      <option value="sql">SQL</option>
-                      <option value="bash">Bash</option>
-                      <option value="json">JSON</option>
-                      <option value="yaml">YAML</option>
-                      <option value="markdown">Markdown</option>
-                      <option value="others">Others</option>
-                    </select>
-                    <Input
-                      placeholder="Tags (comma-separated)"
-                      value={tags}
-                      onChange={(e) => setTags(e.target.value)}
-                    />
-                  </div>
-
-                  <Textarea
-                    placeholder="Description (optional)"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    rows={2}
-                    className="resize-none"
-                  />
-
-                  <div className="h-[calc(100vh-320px)] overflow-auto">
-                    <TiptapEditor
-                      content={content}
-                      onChange={setContent}
-                      editable={true}
-                    />
-                  </div>
-                </div>
+              {/* Just the Editor */}
+              <div className="flex-1 overflow-auto p-4">
+                <TiptapEditor
+                  content={content}
+                  onChange={(newContent) => {
+                    setContent(newContent)
+                    // Auto-detect title from first line
+                    const tempDiv = document.createElement('div')
+                    tempDiv.innerHTML = newContent
+                    const firstLine = tempDiv.textContent?.split('\n')[0]?.trim() || ''
+                    if (firstLine) {
+                      setTitle(firstLine.substring(0, 100)) // Limit to 100 chars
+                    }
+                  }}
+                  editable={true}
+                />
               </div>
             </div>
           ) : (
@@ -691,20 +647,7 @@ function App() {
               {/* View Header */}
               <div className="border-b px-3 py-2 flex items-center justify-between bg-background">
                 <div className="flex-1 min-w-0 mr-3">
-                  <h2 className="text-sm font-bold truncate mb-1">{currentSnippet.title}</h2>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <Badge variant="outline">{currentSnippet.language}</Badge>
-                    {currentSnippet.tags && currentSnippet.tags.split(',').map(tag => (
-                      <Badge key={tag} variant="secondary">{tag.trim()}</Badge>
-                    ))}
-                    <span className="text-[10px] text-muted-foreground">
-                      {new Date(currentSnippet.updated_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                      })}
-                    </span>
-                  </div>
+                  <h2 className="text-sm font-bold truncate">{currentSnippet.title}</h2>
                 </div>
                 <div className="flex gap-1.5">
                   <Button
@@ -731,17 +674,7 @@ function App() {
               </div>
 
               {/* View Content */}
-              <div className="flex-1 overflow-auto p-3">
-                {currentSnippet.description && (
-                  <div className="mb-3 p-3 bg-muted/30 rounded-md border border-border">
-                    <div className="flex items-start gap-2">
-                      <div className="shrink-0 mt-0.5">
-                        <div className="w-1 h-1 rounded-full bg-primary" />
-                      </div>
-                      <p className="text-xs text-foreground leading-relaxed">{currentSnippet.description}</p>
-                    </div>
-                  </div>
-                )}
+              <div className="flex-1 overflow-auto p-4">
                 <TiptapEditor
                   content={currentSnippet.content}
                   onChange={() => {}}

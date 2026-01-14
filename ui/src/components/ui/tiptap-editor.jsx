@@ -472,21 +472,12 @@ export function TiptapEditor({ content, onChange, editable = true }) {
     return null
   }
 
-  if (!editable) {
-    // Read-only mode - just display the HTML
-    return (
-      <div 
-        className="prose prose-sm max-w-none p-4 border rounded-md"
-        dangerouslySetInnerHTML={{ __html: content }}
-      />
-    )
-  }
-
   const isCodeBlock = editor.isActive('codeBlock')
 
   return (
     <div className="border rounded-md overflow-hidden">
-      {/* Custom Toolbar */}
+      {/* Custom Toolbar - only show in editable mode */}
+      {editable && (
       <div className="border-b bg-muted/30 p-2 flex flex-wrap gap-1 items-center sticky top-0 z-10">
         {/* Font Size Selector */}
         <Select 
@@ -786,8 +777,11 @@ export function TiptapEditor({ content, onChange, editable = true }) {
           <Redo2 className="h-4 w-4" />
         </Button>
       </div>
+      )}
 
-      {/* Link Input */}
+      {/* Link Input - only show in editable mode */}
+      {editable && (
+      <>
       {showLinkInput && (
         <div className="border-b p-2 flex gap-2 items-center bg-muted/20">
           <Link2 className="h-4 w-4 text-muted-foreground" />
@@ -814,8 +808,6 @@ export function TiptapEditor({ content, onChange, editable = true }) {
           </Button>
         </div>
       )}
-
-      {/* Image Input */}
       {showImageInput && (
         <div className="border-b p-2 flex gap-2 items-center bg-muted/20">
           <ImagePlus className="h-4 w-4 text-muted-foreground" />
@@ -842,8 +834,12 @@ export function TiptapEditor({ content, onChange, editable = true }) {
           </Button>
         </div>
       )}
+      </>
+      )}
 
-      {/* Custom Floating Bubble Menu */}
+      {/* Custom Floating Bubble Menu - only show in editable mode */}
+      {editable && (
+      <>
       {showBubbleMenu && (
         <div
           ref={bubbleMenuRef}
@@ -954,6 +950,8 @@ export function TiptapEditor({ content, onChange, editable = true }) {
             <Link2 className="h-3.5 w-3.5" />
           </Button>
         </div>
+      )}
+      </>
       )}
 
       {/* Editor Content with RichTextProvider for bubble menus */}
