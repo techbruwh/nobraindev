@@ -197,7 +197,8 @@ const LANGUAGES = [
   { value: 'plaintext', label: 'Plain Text' }
 ]
 
-export function TiptapEditor({ content, onChange, editable = true }) {
+export function TiptapEditor({ content, onChange, editable = true, autoFocus = false }) {
+  const isMountedRef = useRef(true)
   const [editorContent, setEditorContent] = useState(content || '')
   const [showLinkInput, setShowLinkInput] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
@@ -289,13 +290,18 @@ export function TiptapEditor({ content, onChange, editable = true }) {
     content: editorContent,
     editable,
     onUpdate: ({ editor }) => {
-      const html = editor.getHTML()
-      setEditorContent(html)
-      onChange?.(html)
+      if (!isMountedRef.current || !editor || !editor.view || editor.isDestroyed) return
+      try {
+        const html = editor.getHTML()
+        setEditorContent(html)
+        onChange?.(html)
+      } catch (error) {
+        console.warn('Editor update error:', error)
+      }
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-sm max-w-none focus:outline-none min-h-[200px] p-3',
+        class: 'prose prose-sm max-w-none focus:outline-none min-h-[200px] p-2',
         spellcheck: 'false',
         autocomplete: 'off',
         autocorrect: 'off',
@@ -304,24 +310,58 @@ export function TiptapEditor({ content, onChange, editable = true }) {
     }
   })
 
+  // Track component mount status
   useEffect(() => {
-    if (editor && content !== editorContent) {
-      editor.commands.setContent(content || '', false)
-      setEditorContent(content || '')
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (editor && !editor.isDestroyed && content !== editorContent) {
+      try {
+        editor.commands.setContent(content || '', false)
+        setEditorContent(content || '')
+      } catch (error) {
+        console.warn('Error setting editor content:', error)
+      }
     }
   }, [content, editor])
 
   useEffect(() => {
-    if (editor) {
-      editor.setEditable(editable)
+    if (editor && !editor.isDestroyed) {
+      try {
+        editor.setEditable(editable)
+      } catch (error) {
+        console.warn('Error setting editor editable:', error)
+      }
     }
   }, [editable, editor])
 
+  // Auto-focus editor when autoFocus is true
+  useEffect(() => {
+    if (autoFocus && editor && !editor.isDestroyed && editor.view) {
+      try {
+        // Small delay to ensure editor is fully mounted
+        setTimeout(() => {
+          if (editor && !editor.isDestroyed) {
+            editor.commands.focus('start')
+          }
+        }, 100)
+      } catch (error) {
+        console.warn('Error focusing editor:', error)
+      }
+    }
+  }, [autoFocus, editor])
+
   // Handle clicks on links to show popup
   useEffect(() => {
-    if (!editor) return
+    if (!editor || !editor.view || !editor.view.dom) return
 
     const handleClick = (event) => {
+      if (!isMountedRef.current) return
+      
       const target = event.target
       
       // Check if clicked on a link
@@ -347,20 +387,29 @@ export function TiptapEditor({ content, onChange, editable = true }) {
     editorElement.addEventListener('click', handleClick)
 
     return () => {
-      editorElement.removeEventListener('click', handleClick)
+      try {
+        editorElement.removeEventListener('click', handleClick)
+      } catch (error) {
+        // Ignore cleanup errors
+      }
     }
   }, [editor])
 
   // Update current language when cursor moves into a code block
   useEffect(() => {
-    if (!editor) return
+    if (!editor || editor.isDestroyed) return
 
     const updateLanguage = () => {
-      if (editor.isActive('codeBlock')) {
-        const { language } = editor.getAttributes('codeBlock')
-        if (language) {
-          setCurrentLanguage(language)
+      if (!isMountedRef.current || editor.isDestroyed) return
+      try {
+        if (editor.isActive('codeBlock')) {
+          const { language } = editor.getAttributes('codeBlock')
+          if (language) {
+            setCurrentLanguage(language)
+          }
         }
+      } catch (error) {
+        // Ignore errors during cleanup
       }
     }
 
@@ -368,35 +417,54 @@ export function TiptapEditor({ content, onChange, editable = true }) {
     editor.on('update', updateLanguage)
 
     return () => {
-      editor.off('selectionUpdate', updateLanguage)
-      editor.off('update', updateLanguage)
+      try {
+        if (!editor.isDestroyed) {
+          editor.off('selectionUpdate', updateLanguage)
+          editor.off('update', updateLanguage)
+        }
+      } catch (error) {
+        // Ignore cleanup errors
+      }
     }
   }, [editor])
 
   // Update current font size when selection changes
   useEffect(() => {
-    if (!editor) return
+    if (!editor || editor.isDestroyed) return
 
     const updateFontSize = () => {
-      const { fontSize } = editor.getAttributes('textStyle')
-      setCurrentFontSize(fontSize || '16px')
+      if (!isMountedRef.current || editor.isDestroyed) return
+      try {
+        const { fontSize } = editor.getAttributes('textStyle')
+        setCurrentFontSize(fontSize || '16px')
+      } catch (error) {
+        // Ignore errors during cleanup
+      }
     }
 
     editor.on('selectionUpdate', updateFontSize)
     editor.on('transaction', updateFontSize)
 
     return () => {
-      editor.off('selectionUpdate', updateFontSize)
-      editor.off('transaction', updateFontSize)
+      try {
+        if (!editor.isDestroyed) {
+          editor.off('selectionUpdate', updateFontSize)
+          editor.off('transaction', updateFontSize)
+        }
+      } catch (error) {
+        // Ignore cleanup errors
+      }
     }
   }, [editor])
 
   // Handle bubble menu positioning
   useEffect(() => {
-    if (!editor) return
+    if (!editor || editor.isDestroyed) return
 
     const updateBubbleMenu = () => {
-      const { from, to, empty } = editor.state.selection
+      if (!isMountedRef.current || editor.isDestroyed) return
+      try {
+        const { from, to, empty } = editor.state.selection
       
       if (empty || !editable) {
         setShowBubbleMenu(false)
@@ -436,24 +504,37 @@ export function TiptapEditor({ content, onChange, editable = true }) {
         top = rect.bottom + window.scrollY + 8
       }
 
-      setBubbleMenuPosition({ top, left })
-      setShowBubbleMenu(true)
+        setBubbleMenuPosition({ top, left })
+        setShowBubbleMenu(true)
+      } catch (error) {
+        // Ignore errors during cleanup
+      }
     }
 
-    editor.on('selectionUpdate', updateBubbleMenu)
-    editor.on('transaction', updateBubbleMenu)
-    editor.on('blur', () => {
+    const handleBlur = () => {
+      if (!isMountedRef.current) return
       // Delay hiding to allow clicking menu items
       setTimeout(() => {
         if (!bubbleMenuRef.current?.contains(document.activeElement)) {
           setShowBubbleMenu(false)
         }
       }, 100)
-    })
+    }
+
+    editor.on('selectionUpdate', updateBubbleMenu)
+    editor.on('transaction', updateBubbleMenu)
+    editor.on('blur', handleBlur)
 
     return () => {
-      editor.off('selectionUpdate', updateBubbleMenu)
-      editor.off('transaction', updateBubbleMenu)
+      try {
+        if (!editor.isDestroyed) {
+          editor.off('selectionUpdate', updateBubbleMenu)
+          editor.off('transaction', updateBubbleMenu)
+          editor.off('blur', handleBlur)
+        }
+      } catch (error) {
+        // Ignore cleanup errors
+      }
     }
   }, [editor, editable])
 
@@ -531,7 +612,12 @@ export function TiptapEditor({ content, onChange, editable = true }) {
   }
 
   if (!editor) {
-    return null
+    return <div className="p-4 text-muted-foreground text-sm">Loading editor...</div>
+  }
+
+  // Wait for editor view to be ready before calling any methods
+  if (!editor.view || !editor.view.dom) {
+    return <div className="p-4 text-muted-foreground text-sm">Initializing editor...</div>
   }
 
   const isCodeBlock = editor.isActive('codeBlock')

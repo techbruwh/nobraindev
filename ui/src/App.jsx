@@ -15,7 +15,6 @@ import { SnippetsPanel } from '@/components/ui/snippetspanel'
 import { AccountPanel } from '@/components/ui/accountpanel'
 import { ClipboardPanel } from '@/components/ui/clipboardpanel'
 import { TiptapEditor } from '@/components/ui/tiptap-editor'
-import 'reactjs-tiptap-editor/style.css'
 import './tiptap.css'
 
 function App() {
@@ -338,10 +337,12 @@ function App() {
       setHasUnsyncedChanges(true)
       
       await loadSnippets()
-      setIsEditing(false)
       
-      // Wait a bit for state to update, then find and select the saved snippet
+      // Delay unmounting the editor to allow it to cleanup properly
       setTimeout(() => {
+        setIsEditing(false)
+        
+        // Find and select the saved snippet
         setSnippets(prev => {
           const savedSnippet = prev.find(s => 
             savedId ? s.id === savedId : s.title === savedTitle
@@ -351,7 +352,7 @@ function App() {
           }
           return prev
         })
-      }, 100)
+      }, 50)
     } catch (error) {
       console.error('Failed to save snippet:', error)
       showToast('Failed to save snippet', 'error')
@@ -624,20 +625,38 @@ function App() {
               </div>
 
               {/* Just the Editor */}
-              <div className="flex-1 overflow-auto p-4">
+              <div className="flex-1 overflow-auto p-2">
                 <TiptapEditor
                   content={content}
                   onChange={(newContent) => {
                     setContent(newContent)
-                    // Auto-detect title from first line
+                    // Auto-detect title from first heading or first line
                     const tempDiv = document.createElement('div')
                     tempDiv.innerHTML = newContent
-                    const firstLine = tempDiv.textContent?.split('\n')[0]?.trim() || ''
+                    
+                    // Try to get first heading
+                    const firstHeading = tempDiv.querySelector('h1, h2, h3, h4, h5, h6')
+                    if (firstHeading && firstHeading.textContent?.trim()) {
+                      setTitle(firstHeading.textContent.trim().substring(0, 100))
+                      return
+                    }
+                    
+                    // Otherwise get first paragraph or line
+                    const firstParagraph = tempDiv.querySelector('p')
+                    if (firstParagraph && firstParagraph.textContent?.trim()) {
+                      setTitle(firstParagraph.textContent.trim().substring(0, 100))
+                      return
+                    }
+                    
+                    // Fallback to first non-empty text
+                    const allText = tempDiv.textContent?.trim() || ''
+                    const firstLine = allText.split('\n').find(line => line.trim()) || ''
                     if (firstLine) {
-                      setTitle(firstLine.substring(0, 100)) // Limit to 100 chars
+                      setTitle(firstLine.trim().substring(0, 100))
                     }
                   }}
                   editable={true}
+                  autoFocus={true}
                 />
               </div>
             </div>
@@ -674,7 +693,7 @@ function App() {
               </div>
 
               {/* View Content */}
-              <div className="flex-1 overflow-auto p-4">
+              <div className="flex-1 overflow-auto p-2">
                 <TiptapEditor
                   content={currentSnippet.content}
                   onChange={() => {}}
