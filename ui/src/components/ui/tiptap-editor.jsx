@@ -64,52 +64,6 @@ const FontSize = Extension.create({
           },
         },
       },
-    ]
-  },
-
-  addCommands() {
-    return {
-      setFontSize: fontSize => ({ chain, editor }) => {
-        // Apply to regular text
-        const result = chain()
-          .setMark('textStyle', { fontSize })
-          .run()
-        
-        // Apply to code blocks
-        if (editor.isActive('codeBlock')) {
-          editor.commands.updateAttributes('codeBlock', { fontSize })
-        }
-        
-        return result
-      },
-      unsetFontSize: () => ({ chain }) => {
-        return chain()
-          .setMark('textStyle', { fontSize: null })
-          .removeEmptyTextStyle()
-          .run()
-      },
-    }
-  },
-
-  addGlobalAttributes() {
-    return [
-      {
-        types: this.options.types,
-        attributes: {
-          fontSize: {
-            default: null,
-            parseHTML: element => element.style.fontSize.replace(/['"]+/g, ''),
-            renderHTML: attributes => {
-              if (!attributes.fontSize) {
-                return {}
-              }
-              return {
-                style: `font-size: ${attributes.fontSize}`,
-              }
-            },
-          },
-        },
-      },
       {
         types: ['codeBlock'],
         attributes: {
@@ -146,6 +100,30 @@ const FontSize = Extension.create({
       },
     ]
   },
+
+  addCommands() {
+    return {
+      setFontSize: fontSize => ({ chain, editor }) => {
+        // Apply to regular text
+        const result = chain()
+          .setMark('textStyle', { fontSize })
+          .run()
+        
+        // Apply to code blocks
+        if (editor.isActive('codeBlock')) {
+          editor.commands.updateAttributes('codeBlock', { fontSize })
+        }
+        
+        return result
+      },
+      unsetFontSize: () => ({ chain }) => {
+        return chain()
+          .setMark('textStyle', { fontSize: null })
+          .removeEmptyTextStyle()
+          .run()
+      },
+    }
+  },
 })
 
 import { RichTextProvider } from 'reactjs-tiptap-editor'
@@ -177,7 +155,10 @@ import {
   ListTodo,
   Palette,
   ChevronDown,
-  FileCode2
+  FileCode2,
+  ExternalLink,
+  Edit3,
+  Trash2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -220,6 +201,11 @@ export function TiptapEditor({ content, onChange, editable = true }) {
   const [editorContent, setEditorContent] = useState(content || '')
   const [showLinkInput, setShowLinkInput] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
+  const [linkInputPosition, setLinkInputPosition] = useState({ top: 0, left: 0 })
+  const [showLinkPopup, setShowLinkPopup] = useState(false)
+  const [linkPopupPosition, setLinkPopupPosition] = useState({ top: 0, left: 0 })
+  const [currentLinkUrl, setCurrentLinkUrl] = useState('')
+  const [isEditingLink, setIsEditingLink] = useState(false)
   const [showImageInput, setShowImageInput] = useState(false)
   const [imageUrl, setImageUrl] = useState('')
   const [currentLanguage, setCurrentLanguage] = useState('javascript')
@@ -227,6 +213,8 @@ export function TiptapEditor({ content, onChange, editable = true }) {
   const [showBubbleMenu, setShowBubbleMenu] = useState(false)
   const [bubbleMenuPosition, setBubbleMenuPosition] = useState({ top: 0, left: 0 })
   const bubbleMenuRef = useRef(null)
+  const linkInputRef = useRef(null)
+  const linkPopupRef = useRef(null)
 
   const editor = useEditor({
     extensions: [
@@ -266,9 +254,11 @@ export function TiptapEditor({ content, onChange, editable = true }) {
         multicolor: true
       }),
       Link.configure({
-        openOnClick: false,
+        openOnClick: !editable,
         HTMLAttributes: {
-          class: 'text-primary underline cursor-pointer'
+          class: 'text-primary underline cursor-pointer',
+          target: '_blank',
+          rel: 'noopener noreferrer'
         }
       }),
       Image.configure({
@@ -326,6 +316,40 @@ export function TiptapEditor({ content, onChange, editable = true }) {
       editor.setEditable(editable)
     }
   }, [editable, editor])
+
+  // Handle clicks on links to show popup
+  useEffect(() => {
+    if (!editor) return
+
+    const handleClick = (event) => {
+      const target = event.target
+      
+      // Check if clicked on a link
+      if (target.tagName === 'A' && target.href) {
+        event.preventDefault()
+        
+        const rect = target.getBoundingClientRect()
+        const url = target.getAttribute('href')
+        
+        setCurrentLinkUrl(url)
+        setLinkPopupPosition({
+          top: rect.bottom + window.scrollY + 8,
+          left: rect.left + window.scrollX
+        })
+        setShowLinkPopup(true)
+        setIsEditingLink(false)
+      } else if (!linkPopupRef.current?.contains(target)) {
+        setShowLinkPopup(false)
+      }
+    }
+
+    const editorElement = editor.view.dom
+    editorElement.addEventListener('click', handleClick)
+
+    return () => {
+      editorElement.removeEventListener('click', handleClick)
+    }
+  }, [editor])
 
   // Update current language when cursor moves into a code block
   useEffect(() => {
@@ -435,10 +459,48 @@ export function TiptapEditor({ content, onChange, editable = true }) {
 
   const addLink = () => {
     if (linkUrl && editor) {
-      editor.chain().focus().setLink({ href: linkUrl }).run()
+      let url = linkUrl.trim()
+      
+      // Add https:// if no protocol
+      if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url
+      }
+      
+      editor.chain().focus().setLink({ href: url }).run()
       setLinkUrl('')
       setShowLinkInput(false)
     }
+  }
+
+  const updateLink = () => {
+    if (currentLinkUrl && editor) {
+      let url = currentLinkUrl.trim()
+      
+      // Add https:// if no protocol
+      if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url
+      }
+      
+      editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
+      setShowLinkPopup(false)
+      setIsEditingLink(false)
+    }
+  }
+
+  const removeLink = () => {
+    if (editor) {
+      editor.chain().focus().extendMarkRange('link').unsetLink().run()
+      setShowLinkPopup(false)
+    }
+  }
+
+  const openLink = (url) => {
+    // Use anchor tag click to open link - Tauri will handle it
+    const a = document.createElement('a')
+    a.href = url
+    a.target = '_blank'
+    a.rel = 'noopener noreferrer'
+    a.click()
   }
 
   const addImage = () => {
@@ -715,7 +777,30 @@ export function TiptapEditor({ content, onChange, editable = true }) {
           variant="ghost"
           size="sm"
           className="h-8 w-8 p-0"
-          onClick={() => setShowLinkInput(!showLinkInput)}
+          onClick={() => {
+            const { from, to } = editor.state.selection
+            const text = editor.state.doc.textBetween(from, to, '')
+            
+            if (!text) {
+              alert('Please select some text first')
+              return
+            }
+
+            // Get selection position
+            const selection = window.getSelection()
+            if (selection && selection.rangeCount > 0) {
+              const range = selection.getRangeAt(0)
+              const rect = range.getBoundingClientRect()
+              
+              // Position below the selection
+              setLinkInputPosition({
+                top: rect.bottom + window.scrollY + 8,
+                left: rect.left + window.scrollX
+              })
+            }
+            
+            setShowLinkInput(!showLinkInput)
+          }}
           data-active={editor.isActive('link')}
           title="Insert Link"
         >
@@ -779,11 +864,107 @@ export function TiptapEditor({ content, onChange, editable = true }) {
       </div>
       )}
 
-      {/* Link Input - only show in editable mode */}
-      {editable && (
-      <>
-      {showLinkInput && (
-        <div className="border-b p-2 flex gap-2 items-center bg-muted/20">
+      {/* Link Popup - shows when clicking on a link */}
+      {showLinkPopup && (
+        <div 
+          ref={linkPopupRef}
+          className="fixed bg-background border rounded-lg shadow-lg p-2 z-50 min-w-[300px]"
+          style={{
+            top: `${linkPopupPosition.top}px`,
+            left: `${linkPopupPosition.left}px`,
+          }}
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          {isEditingLink ? (
+            // Edit mode
+            <div className="flex gap-2 items-center">
+              <Input
+                type="url"
+                placeholder="Enter URL..."
+                value={currentLinkUrl}
+                onChange={(e) => setCurrentLinkUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    updateLink()
+                  } else if (e.key === 'Escape') {
+                    setIsEditingLink(false)
+                    setShowLinkPopup(false)
+                  }
+                }}
+                className="h-8 text-xs flex-1"
+                autoFocus
+              />
+              <Button size="sm" className="h-8" onClick={updateLink}>
+                Save
+              </Button>
+              <Button size="sm" variant="ghost" className="h-8" onClick={() => setIsEditingLink(false)}>
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            // View mode
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Link2 className="h-3 w-3 shrink-0" />
+                <a 
+                  href={currentLinkUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex-1 truncate hover:text-primary"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {currentLinkUrl}
+                </a>
+              </div>
+              <div className="flex gap-1 justify-center">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="h-8 w-8 p-0"
+                  onClick={() => openLink(currentLinkUrl)}
+                  title="Open link"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
+                {editable && (
+                  <>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="h-8 w-8 p-0"
+                      onClick={() => setIsEditingLink(true)}
+                      title="Edit link"
+                    >
+                      <Edit3 className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="destructive" 
+                      className="h-8 w-8 p-0"
+                      onClick={removeLink}
+                      title="Remove link"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Floating Link Input - only show in editable mode */}
+      {editable && showLinkInput && (
+        <div 
+          ref={linkInputRef}
+          className="fixed bg-background border rounded-lg shadow-lg p-2 flex gap-2 items-center z-50"
+          style={{
+            top: `${linkInputPosition.top}px`,
+            left: `${linkInputPosition.left}px`,
+          }}
+          onMouseDown={(e) => e.preventDefault()}
+        >
           <Link2 className="h-4 w-4 text-muted-foreground" />
           <Input
             type="url"
@@ -797,7 +978,7 @@ export function TiptapEditor({ content, onChange, editable = true }) {
                 setShowLinkInput(false)
               }
             }}
-            className="h-8 text-xs"
+            className="h-8 text-xs w-64"
             autoFocus
           />
           <Button size="sm" className="h-8" onClick={addLink}>
@@ -808,6 +989,9 @@ export function TiptapEditor({ content, onChange, editable = true }) {
           </Button>
         </div>
       )}
+
+      {editable && (
+      <>
       {showImageInput && (
         <div className="border-b p-2 flex gap-2 items-center bg-muted/20">
           <ImagePlus className="h-4 w-4 text-muted-foreground" />
@@ -944,7 +1128,31 @@ export function TiptapEditor({ content, onChange, editable = true }) {
             variant="ghost"
             size="sm"
             className="h-7 w-7 p-0"
-            onClick={() => setShowLinkInput(!showLinkInput)}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              const { from, to } = editor.state.selection
+              const text = editor.state.doc.textBetween(from, to, '')
+              
+              if (!text) {
+                alert('Please select some text first')
+                return
+              }
+
+              // Get selection position
+              const selection = window.getSelection()
+              if (selection && selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0)
+                const rect = range.getBoundingClientRect()
+                
+                // Position below the selection
+                setLinkInputPosition({
+                  top: rect.bottom + window.scrollY + 8,
+                  left: rect.left + window.scrollX
+                })
+              }
+              
+              setShowLinkInput(!showLinkInput)
+            }}
             data-active={editor.isActive('link')}
           >
             <Link2 className="h-3.5 w-3.5" />

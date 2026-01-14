@@ -16,6 +16,32 @@
   outline: none;
 }
 
+/* Link styling - very specific to override any defaults */
+.ProseMirror a,
+.tiptap-editor-wrapper a,
+.ProseMirror a[href],
+.tiptap-editor-wrapper a[href],
+a.text-primary {
+  color: #0066ff !important;
+  text-decoration: underline !important;
+  text-decoration-thickness: 2px !important;
+  text-underline-offset: 2px !important;
+  cursor: pointer !important;
+  transition: all 0.2s;
+  font-weight: 500 !important;
+}
+
+.ProseMirror a:hover,
+.tiptap-editor-wrapper a:hover,
+.ProseMirror a[href]:hover,
+.tiptap-editor-wrapper a[href]:hover,
+a.text-primary:hover {
+  color: #0052cc !important;
+  text-decoration: underline !important;
+  text-decoration-thickness: 2px !important;
+  background-color: rgba(0, 102, 255, 0.1) !important;
+}
+
 /* Bubble Menu Styling */
 .tippy-box[data-theme~='light'] {
   background-color: hsl(var(--background));
