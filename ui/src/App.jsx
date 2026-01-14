@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { Plus, Search, FileCode, X, Edit, Trash2, Copy, Save, Brain, Download, Sparkles, CheckCircle, AlertCircle, Info, PanelLeftClose, PanelLeft, Keyboard, Code, Braces, RefreshCw, Cloud, User } from 'lucide-react'
 import { useSupabaseAuth } from '@/lib/supabase-auth'
@@ -14,9 +14,9 @@ import { MenuSidebar } from '@/components/ui/menusidebar'
 import { SnippetsPanel } from '@/components/ui/snippetspanel'
 import { AccountPanel } from '@/components/ui/accountpanel'
 import { ClipboardPanel } from '@/components/ui/clipboardpanel'
-const ReactQuill = lazy(() => import('react-quill-new'))
-import 'react-quill-new/dist/quill.snow.css'
-import './editor.css'
+import { TiptapEditor } from '@/components/ui/tiptap-editor'
+import 'reactjs-tiptap-editor/style.css'
+import './tiptap.css'
 
 function App() {
   const { user } = useSupabaseAuth()
@@ -51,9 +51,6 @@ function App() {
   const [tags, setTags] = useState('')
   const [description, setDescription] = useState('')
   const [content, setContent] = useState('')
-  
-  // Quill editor ref
-  const quillRef = useRef(null)
   
   // Ref to store the save function
   const saveSnippetRef = useRef(null)
@@ -142,100 +139,6 @@ function App() {
     }
   }, [isResizing])
 
-  // Setup Quill tab handler and fix spaces after load
-  useEffect(() => {
-    if (quillRef.current && isEditing && currentSnippet) {
-      const quill = quillRef.current.getEditor()
-      
-      // CUSTOMIZE TOOLBAR ICONS - Add this section
-      const toolbar = quill.getModule('toolbar')
-      if (toolbar && toolbar.container) {
-        // Find and customize the inline code button
-        const codeButton = toolbar.container.querySelector('button.ql-code')
-        if (codeButton) {
-          codeButton.innerHTML = '<span style="font-family: monospace; font-weight: bold; font-size: 12px; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">&lt;&gt;</span>'
-          codeButton.setAttribute('title', 'Inline Code')
-          codeButton.style.display = 'flex'
-          codeButton.style.alignItems = 'center'
-          codeButton.style.justifyContent = 'center'
-        }
-
-        // Find and customize the code-block button
-        const codeBlockButton = toolbar.container.querySelector('button.ql-code-block')
-        if (codeBlockButton) {
-          codeBlockButton.innerHTML = '<span style="font-family: monospace; font-weight: bold; font-size: 12px; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; letter-spacing: 1px;">{}</span>'
-          codeBlockButton.setAttribute('title', 'Code Block')
-          codeBlockButton.style.display = 'flex'
-          codeBlockButton.style.alignItems = 'center'
-          codeBlockButton.style.justifyContent = 'center'
-        }
-      }
-      // Fix spaces in code blocks after content loads by directly manipulating the DOM
-      const fixSpaces = () => {
-        // Parse the original content to find spaces
-        const parser = new DOMParser()
-        const doc = parser.parseFromString(currentSnippet.content, 'text/html')
-        const originalBlocks = doc.querySelectorAll('.ql-code-block')
-        const editorBlocks = quill.root.querySelectorAll('.ql-code-block')
-        
-        // Compare and restore spaces
-        originalBlocks.forEach((originalBlock, index) => {
-          if (editorBlocks[index]) {
-            const originalText = originalBlock.textContent
-            const editorText = editorBlocks[index].textContent
-            
-            // If original had leading spaces but editor doesn't
-            const originalLeading = originalText.match(/^(\s+)/)
-            const editorLeading = editorText.match(/^(\s+)/)
-            
-            if (originalLeading && (!editorLeading || originalLeading[1].length > (editorLeading[1] || '').length)) {
-              // Restore the spaces by directly setting innerHTML with &nbsp;
-              const spaces = originalLeading[1]
-              const rest = originalText.substring(spaces.length)
-              editorBlocks[index].innerHTML = spaces.replace(/ /g, '&nbsp;') + rest
-            }
-          }
-        })
-      }
-      
-      // Run after Quill finishes rendering
-      setTimeout(fixSpaces, 300)
-      
-      // Override tab key behavior
-      const handleTab = (e) => {
-        if (e.key === 'Tab' && !e.shiftKey) {
-          const selection = quill.getSelection()
-          if (selection) {
-            const format = quill.getFormat(selection.index)
-            if (format['code-block']) {
-              e.preventDefault()
-              e.stopPropagation()
-              
-              // Insert HTML with non-breaking spaces directly
-              const range = quill.getSelection()
-              const delta = quill.clipboard.convert({ html: '&nbsp;&nbsp;' })
-              quill.updateContents(
-                new (quill.constructor.import('delta'))()
-                  .retain(range.index)
-                  .concat(delta),
-                'user'
-              )
-              quill.setSelection(range.index + 2, 0)
-              
-              return false
-            }
-          }
-        }
-      }
-      
-      const editorElement = quill.root
-      editorElement.addEventListener('keydown', handleTab, { capture: true })
-      
-      return () => {
-        editorElement.removeEventListener('keydown', handleTab, { capture: true })
-      }
-    }
-  }, [isEditing, content])
 
   // Keep the save function ref updated
   useEffect(() => {
@@ -289,71 +192,13 @@ function App() {
         setShowShortcutsHelp(prev => !prev)
         return
       }
-      // Cmd/Ctrl + E for inline code (when editing)
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'e') {
-        if (isEditing && quillRef.current) {
-          e.preventDefault()
-          e.stopPropagation()
-          const quill = quillRef.current.getEditor()
-          const format = quill.getFormat()
-          quill.format('code', !format.code)
-        }
-        return
-      }
-      // Cmd/Ctrl + Shift + C for code block (when editing)
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'C' || e.key === 'c')) {
-        if (isEditing && quillRef.current) {
-          e.preventDefault()
-          e.stopPropagation()
-          console.log('Code block shortcut triggered')
-          const quill = quillRef.current.getEditor()
-          const format = quill.getFormat()
-          quill.format('code-block', !format['code-block'])
-        }
-        return
-      }
     }
     
-    // Use capture phase to catch events before they reach Quill
     window.addEventListener('keydown', handleKeyDown, true)
     return () => window.removeEventListener('keydown', handleKeyDown, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing, sidebarCollapsed, showShortcutsHelp])
 
-  // Customize Quill toolbar icons whenever editor is shown
-  useEffect(() => {
-    if (quillRef.current && isEditing) {
-      // Small delay to ensure Quill toolbar is fully rendered
-      const timer = setTimeout(() => {
-        const quill = quillRef.current.getEditor()
-        const toolbar = quill.getModule('toolbar')
-        
-        if (toolbar && toolbar.container) {
-          // Find and customize the inline code button
-          const codeButton = toolbar.container.querySelector('button.ql-code')
-          if (codeButton) {
-            codeButton.innerHTML = '<span style="font-family: monospace; font-weight: bold; font-size: 12px; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">&lt;&gt;</span>'
-            codeButton.setAttribute('title', 'Inline Code')
-            codeButton.style.display = 'flex'
-            codeButton.style.alignItems = 'center'
-            codeButton.style.justifyContent = 'center'
-          }
-          
-          // Find and customize the code-block button
-          const codeBlockButton = toolbar.container.querySelector('button.ql-code-block')
-          if (codeBlockButton) {
-            codeBlockButton.innerHTML = '<span style="font-family: monospace; font-weight: bold; font-size: 12px; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; letter-spacing: 1px;">{}</span>'
-            codeBlockButton.setAttribute('title', 'Code Block')
-            codeBlockButton.style.display = 'flex'
-            codeBlockButton.style.alignItems = 'center'
-            codeBlockButton.style.justifyContent = 'center'
-          }
-        }
-      }, 100)
-      
-      return () => clearTimeout(timer)
-    }
-  }, [isEditing])
 
   const loadSnippets = async () => {
     try {
@@ -448,22 +293,7 @@ function App() {
     setLanguage(snippet.language)
     setTags(snippet.tags || '')
     setDescription(snippet.description || '')
-    
-    // Use zero-width non-joiner (&#8204;) before spaces to preserve them
-    // This character is invisible but prevents Quill from stripping spaces
-    let preservedContent = snippet.content
-    preservedContent = preservedContent.replace(
-      /(<div class="ql-code-block"[^>]*>)(\s+)/g,
-      (match, tag, spaces) => {
-        // Add zero-width non-joiner before each space
-        const preserved = spaces.split('').map(char => 
-          char === ' ' ? '\u200C ' : char
-        ).join('')
-        return tag + preserved
-      }
-    )
-    
-    setContent(preservedContent)
+    setContent(snippet.content)
   }
 
   const handleSaveSnippet = async () => {
@@ -845,26 +675,13 @@ function App() {
                     className="resize-none"
                   />
 
-                  <Suspense fallback={<div className="flex items-center justify-center h-32 text-xs text-muted-foreground">Loading editor...</div>}>
-                    <ReactQuill
-                      ref={quillRef}
-                      theme="snow"
-                      value={content}
+                  <div className="h-[calc(100vh-320px)] overflow-auto">
+                    <TiptapEditor
+                      content={content}
                       onChange={setContent}
-                      placeholder="Paste your code here..."
-                      className="h-[calc(100vh-320px)]"
-                      modules={{
-                        toolbar: [
-                          [{ 'header': [1, 2, 3, false] }],
-                          ['bold', 'italic', 'underline', 'code'],
-                          ['blockquote', 'code-block'],
-                          [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                          ['link'],
-                          ['clean']
-                        ]
-                      }}
+                      editable={true}
                     />
-                  </Suspense>
+                  </div>
                 </div>
               </div>
             </div>
@@ -925,8 +742,10 @@ function App() {
                     </div>
                   </div>
                 )}
-                <div className="ql-snow-content" 
-                     dangerouslySetInnerHTML={{ __html: currentSnippet.content }} 
+                <TiptapEditor
+                  content={currentSnippet.content}
+                  onChange={() => {}}
+                  editable={false}
                 />
               </div>
             </div>
@@ -1008,24 +827,6 @@ function App() {
                   <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
                     <span className="text-xs">Cancel editing</span>
                     <kbd className="px-2 py-1 text-[10px] font-medium bg-muted border border-border rounded">Esc</kbd>
-                  </div>
-                  <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
-                    <div className="flex items-center gap-2">
-                      <Code className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-xs">Inline code</span>
-                    </div>
-                    <kbd className="px-2 py-1 text-[10px] font-medium bg-muted border border-border rounded">{isMac ? '⌘' : 'Ctrl'} E</kbd>
-                  </div>
-                  <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
-                    <div className="flex items-center gap-2">
-                      <Braces className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-xs">Code block</span>
-                    </div>
-                    <kbd className="px-2 py-1 text-[10px] font-medium bg-muted border border-border rounded">{isMac ? '⌘' : 'Ctrl'} Shift C</kbd>
-                  </div>
-                  <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
-                    <span className="text-xs">Insert tab (in code block)</span>
-                    <kbd className="px-2 py-1 text-[10px] font-medium bg-muted border border-border rounded">Tab</kbd>
                   </div>
                 </div>
               </div>

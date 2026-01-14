@@ -33,7 +33,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           'react-vendor': ['react', 'react-dom'],
-          'editor': ['react-quill-new'],
+          'tiptap': ['@tiptap/react', '@tiptap/starter-kit'],
           'supabase': ['@supabase/supabase-js']
         }
       }
