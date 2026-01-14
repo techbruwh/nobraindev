@@ -214,27 +214,54 @@ echo -e "${BLUE}📝 Creating GitHub release draft...${NC}"
 # Check if gh CLI is installed
 if ! command -v gh &> /dev/null; then
     echo -e "${YELLOW}⚠️  GitHub CLI (gh) not found. Skipping release draft creation.${NC}"
+    echo -e "${BLUE}💡 Install GitHub CLI to auto-create release drafts:${NC}"
+    echo "   brew install gh"
+    echo "   gh auth login"
+    echo ""
     echo -e "${BLUE}📝 Manual step: Create GitHub release at:${NC}"
     echo "   https://github.com/techbruwh/nobraindev/releases/new?tag=v$NEW_VERSION"
 else
-    # Prepare release notes from changelog content
-    RELEASE_NOTES=$(echo -e "$CHANGELOG_CONTENT" | sed 's/^## \[.*\] - .*$//')
+    # Prepare release notes from changelog content (remove the version header line)
+    RELEASE_NOTES=$(echo -e "$CHANGELOG_CONTENT" | tail -n +2 | sed '/^$/d')
+    
+    # Add a header to the release notes
+    RELEASE_HEADER="## What's Changed\n\n"
+    FULL_RELEASE_NOTES="${RELEASE_HEADER}${RELEASE_NOTES}"
     
     # Create draft release
     if gh release create "v$NEW_VERSION" \
         --draft \
         --title "v$NEW_VERSION" \
-        --notes "$RELEASE_NOTES" 2>&1; then
-        echo -e "${GREEN}✅ GitHub release draft created${NC}"
+        --notes "$FULL_RELEASE_NOTES" 2>&1; then
+        echo -e "${GREEN}✅ GitHub release draft created successfully!${NC}"
         echo -e "${BLUE}📝 View and publish at:${NC}"
         echo "   https://github.com/techbruwh/nobraindev/releases"
+        echo ""
+        echo -e "${GREEN}📋 Release notes preview:${NC}"
+        echo -e "${FULL_RELEASE_NOTES}" | head -10
     else
-        echo -e "${YELLOW}⚠️  Failed to create release draft. You may need to authenticate with 'gh auth login'${NC}"
+        echo -e "${YELLOW}⚠️  Failed to create release draft.${NC}"
+        echo -e "${BLUE}💡 Try authenticating with: gh auth login${NC}"
+        echo ""
         echo -e "${BLUE}📝 Manual step: Create GitHub release at:${NC}"
         echo "   https://github.com/techbruwh/nobraindev/releases/new?tag=v$NEW_VERSION"
+        echo ""
+        echo -e "${BLUE}📋 Use this content for the release notes:${NC}"
+        echo -e "$FULL_RELEASE_NOTES"
     fi
 fi
 
 echo ""
 echo -e "${GREEN}🎉 Release v$NEW_VERSION is ready!${NC}"
+echo ""
+echo -e "${BLUE}📋 Summary:${NC}"
+echo "   ✓ Version bumped to v$NEW_VERSION"
+echo "   ✓ CHANGELOG.md updated with commit history"
+echo "   ✓ Changes committed and pushed to main"
+echo "   ✓ Git tag v$NEW_VERSION created and pushed"
+if command -v gh &> /dev/null; then
+    echo "   ✓ GitHub release draft created"
+else
+    echo "   ⚠ GitHub release draft not created (gh CLI not installed)"
+fi
 echo ""

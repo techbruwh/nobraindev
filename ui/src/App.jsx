@@ -574,16 +574,40 @@ function App() {
             >
               {sidebarCollapsed ? <PanelLeft className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
             </Button>
-            {currentSnippet && !isEditing && (
-              <span className="text-xs text-muted-foreground truncate">
-                {currentSnippet.title}
-              </span>
-            )}
-            {isEditing && (
-              <span className="text-xs text-muted-foreground">
-                {currentSnippet ? 'Editing' : 'New Snippet'}
-              </span>
-            )}
+            
+            {/* Spacer to push buttons to the right */}
+            <div className="flex-1"></div>
+            
+            {/* Action Buttons - Change based on mode */}
+            {isEditing ? (
+              // Edit/Create Mode - Show Save and Cancel
+              <div className="flex items-center gap-1.5">
+                <Button variant="outline" size="sm" className="h-7 px-2 text-[10px]" onClick={() => setIsEditing(false)}>
+                  <X className="h-3 w-3 mr-1" />
+                  Cancel
+                </Button>
+                <Button size="sm" className="h-7 px-2 text-[10px]" onClick={handleSaveSnippet}>
+                  <Save className="h-3 w-3 mr-1" />
+                  Save
+                </Button>
+              </div>
+            ) : currentSnippet ? (
+              // View Mode - Show Copy, Edit, Delete
+              <div className="flex items-center gap-1.5">
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px]" onClick={() => handleCopyCode(currentSnippet.content)}>
+                  <Copy className="h-3 w-3 mr-1" />
+                  Copy
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px]" onClick={() => handleEditSnippet(currentSnippet)}>
+                  <Edit className="h-3 w-3 mr-1" />
+                  Edit
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] text-destructive hover:text-destructive" onClick={() => handleDeleteSnippet(currentSnippet)}>
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Delete
+                </Button>
+              </div>
+            ) : null}
           </div>
 
           {/* Content Area */}
@@ -607,23 +631,6 @@ function App() {
           ) : isEditing ? (
             // Editor Mode - Clean editor only for both new and edit
             <div className="flex-1 flex flex-col overflow-hidden">
-              {/* Minimal Header */}
-              <div className="border-b px-3 py-2 flex items-center justify-between bg-background">
-                <h2 className="text-sm font-semibold">
-                  {currentSnippet ? 'Edit Snippet' : 'New Snippet'}
-                </h2>
-                <div className="flex gap-1.5">
-                  <Button variant="outline" onClick={() => setIsEditing(false)}>
-                    <X className="h-3 w-3 mr-1" />
-                    Cancel
-                  </Button>
-                  <Button onClick={handleSaveSnippet}>
-                    <Save className="h-3 w-3 mr-1" />
-                    Save
-                  </Button>
-                </div>
-              </div>
-
               {/* Just the Editor */}
               <div className="flex-1 overflow-auto p-2">
                 <TiptapEditor
@@ -663,35 +670,6 @@ function App() {
           ) : (
             // View Mode
             <div className="flex-1 flex flex-col overflow-hidden">
-              {/* View Header */}
-              <div className="border-b px-3 py-2 flex items-center justify-between bg-background">
-                <div className="flex-1 min-w-0 mr-3">
-                  <h2 className="text-sm font-bold truncate">{currentSnippet.title}</h2>
-                </div>
-                <div className="flex gap-1.5">
-                  <Button
-                    variant="outline"
-                    onClick={() => handleCopyCode(currentSnippet.content)}
-                  >
-                    <Copy className="h-3 w-3 mr-1" />
-                    Copy
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => handleEditSnippet(currentSnippet)}
-                  >
-                    <Edit className="h-3 w-3 mr-1" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={() => handleDeleteSnippet(currentSnippet)}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-
               {/* View Content */}
               <div className="flex-1 overflow-auto p-2">
                 <TiptapEditor
