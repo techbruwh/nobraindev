@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.4] - 2026-01-14
+
+### ✨ Features
+-  add link management features to Tiptap editor, including link popup for editing and removing links, and improved link styling
+-  migrate from ReactQuill to Tiptap editor, updating dependencies and styles accordingly
+
+### ♻️ Refactoring
+-  update UI components in AccountPanel and SnippetsPanel for improved layout and styling
+-  streamline editor UI by simplifying the editor form and enhancing auto-title detection
+
+### 🔧 Chores
+-  update readme
+
+
+
 ## [1.3.3] - 2026-01-13
 
 ### ✨ Features
