@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.5] - 2026-01-14
+
+### ♻️ Refactoring
+-  enhance Tiptap editor functionality with improved auto-title detection, editor focus handling, and cleanup processes
+
+### 🔧 Chores
+-  push changelog message into release draft
+
+
+
 ## [1.3.4] - 2026-01-14
 
 ### ✨ Features
