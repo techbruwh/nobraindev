@@ -292,12 +292,7 @@ export function AccountPanel({
               </Button>
             )}
 
-            <div className="pt-3 border-t">
-              <div className="flex items-start gap-2 text-[10px] text-muted-foreground">
-                <ShieldCheck className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                <p>Your snippets will be synced securely to the cloud using end to end encryption so no one can read it except you.</p>
-              </div>
-            </div>
+            
           </div>
         ) : (
           // Logged In View

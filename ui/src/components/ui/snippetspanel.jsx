@@ -217,34 +217,23 @@ export function SnippetsPanel({
               key={snippet.id}
               ref={(el) => snippetRefs.current[snippet.id] = el}
               onClick={() => onSnippetClick(snippet)}
-              className={`p-2 border rounded-md cursor-pointer transition-all ${
+              className={`p-2.5 border rounded-lg cursor-pointer transition-all ${
                 currentSnippet?.id === snippet.id 
-                  ? 'bg-accent border-primary/50 ring-1 ring-primary/20' 
-                  : 'bg-accent/30 border-border/50 hover:bg-accent/50 hover:border-border'
+                  ? 'bg-accent border-primary/50 ring-1 ring-primary/20 shadow-sm' 
+                  : 'bg-accent/30 border-border/50 hover:bg-accent/50 hover:border-border hover:shadow-sm'
               }`}
             >
               <div className="flex items-start gap-2">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <h3 className="text-[10px] font-medium truncate">
-                      {snippet.title}
-                    </h3>
-                    <Badge variant="secondary" className="shrink-0 text-[8px]">
-                      {snippet.language}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground mb-1">
-                    <span>{new Date(snippet.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                    {snippet.tags && (
-                      <>
-                        <span>•</span>
-                        <span className="truncate">{snippet.tags.split(',')[0]}</span>
-                      </>
-                    )}
-                  </div>
+                  <h3 className="text-[11px] font-medium truncate mb-1">
+                    {snippet.title}
+                  </h3>
+                  <p className="text-[10px] text-muted-foreground mb-1">
+                    {new Date(snippet.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </p>
                   {snippet.content && (
-                    <p className="text-[9px] text-muted-foreground line-clamp-2 font-mono">
-                      {snippet.content}
+                    <p className="text-[10px] text-muted-foreground line-clamp-2 font-mono leading-relaxed">
+                      {snippet.content.replace(/<[^>]*>/g, '').substring(0, 100)}
                     </p>
                   )}
                 </div>
