@@ -207,9 +207,34 @@ echo -e "${BLUE}⬆️  Pushing tag v$NEW_VERSION...${NC}"
 git push origin "v$NEW_VERSION"
 echo -e "${GREEN}✅ Pushed tag: v$NEW_VERSION${NC}"
 
+# Create GitHub release draft with changelog
+echo ""
+echo -e "${BLUE}📝 Creating GitHub release draft...${NC}"
+
+# Check if gh CLI is installed
+if ! command -v gh &> /dev/null; then
+    echo -e "${YELLOW}⚠️  GitHub CLI (gh) not found. Skipping release draft creation.${NC}"
+    echo -e "${BLUE}📝 Manual step: Create GitHub release at:${NC}"
+    echo "   https://github.com/techbruwh/nobraindev/releases/new?tag=v$NEW_VERSION"
+else
+    # Prepare release notes from changelog content
+    RELEASE_NOTES=$(echo -e "$CHANGELOG_CONTENT" | sed 's/^## \[.*\] - .*$//')
+    
+    # Create draft release
+    if gh release create "v$NEW_VERSION" \
+        --draft \
+        --title "v$NEW_VERSION" \
+        --notes "$RELEASE_NOTES" 2>&1; then
+        echo -e "${GREEN}✅ GitHub release draft created${NC}"
+        echo -e "${BLUE}📝 View and publish at:${NC}"
+        echo "   https://github.com/techbruwh/nobraindev/releases"
+    else
+        echo -e "${YELLOW}⚠️  Failed to create release draft. You may need to authenticate with 'gh auth login'${NC}"
+        echo -e "${BLUE}📝 Manual step: Create GitHub release at:${NC}"
+        echo "   https://github.com/techbruwh/nobraindev/releases/new?tag=v$NEW_VERSION"
+    fi
+fi
+
 echo ""
 echo -e "${GREEN}🎉 Release v$NEW_VERSION is ready!${NC}"
-echo ""
-echo -e "${BLUE}📝 Next step: Create GitHub release at:${NC}"
-echo "   https://github.com/techbruwh/nobraindev/releases/new?tag=v$NEW_VERSION"
 echo ""
