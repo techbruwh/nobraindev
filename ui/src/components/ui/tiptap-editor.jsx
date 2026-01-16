@@ -214,6 +214,7 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
   const [showBubbleMenu, setShowBubbleMenu] = useState(false)
   const [bubbleMenuPosition, setBubbleMenuPosition] = useState({ top: 0, left: 0 })
   const bubbleMenuRef = useRef(null)
+  const isInteractingWithMenuRef = useRef(false)
   const linkInputRef = useRef(null)
   const linkPopupRef = useRef(null)
 
@@ -520,17 +521,39 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
 
     const handleBlur = () => {
       if (!isMountedRef.current) return
-      // Delay hiding to allow clicking menu items
+      // Delay hiding to allow clicking menu items and check if selection still exists
       setTimeout(() => {
-        if (!bubbleMenuRef.current?.contains(document.activeElement)) {
-          setShowBubbleMenu(false)
+        if (!editor.isDestroyed) {
+          const { empty } = editor.state.selection
+          // Only hide if:
+          // 1. Selection is empty
+          // 2. Focus is not on the bubble menu
+          // 3. User is not interacting with the menu
+          if (empty &&
+              !bubbleMenuRef.current?.contains(document.activeElement) &&
+              !isInteractingWithMenuRef.current) {
+            setShowBubbleMenu(false)
+          }
         }
-      }, 100)
+      }, 150)
+    }
+
+    const handleFocus = () => {
+      // Show bubble menu when editor gets focus and there's a selection
+      setTimeout(() => {
+        if (!editor.isDestroyed && isMountedRef.current) {
+          const { empty } = editor.state.selection
+          if (!empty) {
+            updateBubbleMenu()
+          }
+        }
+      }, 50)
     }
 
     editor.on('selectionUpdate', updateBubbleMenu)
     editor.on('transaction', updateBubbleMenu)
     editor.on('blur', handleBlur)
+    editor.on('focus', handleFocus)
 
     return () => {
       try {
@@ -538,6 +561,7 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           editor.off('selectionUpdate', updateBubbleMenu)
           editor.off('transaction', updateBubbleMenu)
           editor.off('blur', handleBlur)
+          editor.off('focus', handleFocus)
         }
       } catch (error) {
         // Ignore cleanup errors
@@ -734,7 +758,26 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           variant="ghost"
           size="sm"
           className="h-8 w-8 p-0"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+          onClick={() => {
+            if (editor.isActive('heading', { level: 1 })) {
+              // If already H1, convert to paragraph
+              editor.chain().focus().setParagraph().run()
+            } else {
+              // Apply H1 and remove all other formatting including text style (font size)
+              editor.chain()
+                .focus()
+                .unsetMark('textStyle')
+                .unsetMark('bold')
+                .unsetMark('italic')
+                .unsetMark('underline')
+                .unsetMark('strike')
+                .unsetMark('code')
+                .unsetMark('link')
+                .unsetMark('highlight')
+                .setHeading({ level: 1 })
+                .run()
+            }
+          }}
           data-active={editor.isActive('heading', { level: 1 })}
         >
           <Heading1 className="h-4 w-4" />
@@ -744,7 +787,26 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           variant="ghost"
           size="sm"
           className="h-8 w-8 p-0"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+          onClick={() => {
+            if (editor.isActive('heading', { level: 2 })) {
+              // If already H2, convert to paragraph
+              editor.chain().focus().setParagraph().run()
+            } else {
+              // Apply H2 and remove all other formatting including text style (font size)
+              editor.chain()
+                .focus()
+                .unsetMark('textStyle')
+                .unsetMark('bold')
+                .unsetMark('italic')
+                .unsetMark('underline')
+                .unsetMark('strike')
+                .unsetMark('code')
+                .unsetMark('link')
+                .unsetMark('highlight')
+                .setHeading({ level: 2 })
+                .run()
+            }
+          }}
           data-active={editor.isActive('heading', { level: 2 })}
         >
           <Heading2 className="h-4 w-4" />
@@ -754,7 +816,26 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           variant="ghost"
           size="sm"
           className="h-8 w-8 p-0"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+          onClick={() => {
+            if (editor.isActive('heading', { level: 3 })) {
+              // If already H3, convert to paragraph
+              editor.chain().focus().setParagraph().run()
+            } else {
+              // Apply H3 and remove all other formatting including text style (font size)
+              editor.chain()
+                .focus()
+                .unsetMark('textStyle')
+                .unsetMark('bold')
+                .unsetMark('italic')
+                .unsetMark('underline')
+                .unsetMark('strike')
+                .unsetMark('code')
+                .unsetMark('link')
+                .unsetMark('highlight')
+                .setHeading({ level: 3 })
+                .run()
+            }
+          }}
           data-active={editor.isActive('heading', { level: 3 })}
         >
           <Heading3 className="h-4 w-4" />
@@ -1099,7 +1180,16 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
             top: `${bubbleMenuPosition.top}px`,
             left: `${bubbleMenuPosition.left}px`,
           }}
-          onMouseDown={(e) => e.preventDefault()}
+          onMouseEnter={() => {
+            isInteractingWithMenuRef.current = true
+          }}
+          onMouseLeave={() => {
+            isInteractingWithMenuRef.current = false
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault()
+            isInteractingWithMenuRef.current = true
+          }}
         >
           {/* Font Size in Bubble Menu */}
           <Select 
