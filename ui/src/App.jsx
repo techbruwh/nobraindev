@@ -22,7 +22,6 @@ function App() {
   const isSignedIn = !!user
   const [snippets, setSnippets] = useState([])
   const [currentSnippet, setCurrentSnippet] = useState(null)
-  const [isEditing, setIsEditing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filteredSnippets, setFilteredSnippets] = useState([])
   
@@ -51,15 +50,26 @@ function App() {
   const [description, setDescription] = useState('')
   const [content, setContent] = useState('')
   
-  // Ref to store the save function
-  const saveSnippetRef = useRef(null)
+  // Debounce timeout for auto-save
+  const autoSaveTimeoutRef = useRef(null)
+
+  // Track last saved state to prevent unnecessary saves
+  const lastSavedStateRef = useRef({
+    id: null,
+    title: '',
+    content: '',
+    language: '',
+    tags: '',
+    description: ''
+  })
 
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
     title: '',
     message: '',
-    onConfirm: () => {}
+    onConfirm: () => {},
+    onCancel: () => {}
   })
 
   // Shortcuts help modal state
@@ -139,9 +149,76 @@ function App() {
   }, [isResizing])
 
 
-  // Keep the save function ref updated
+  // Auto-save with debounce - only when actual changes are made
   useEffect(() => {
-    saveSnippetRef.current = handleSaveSnippet
+    const scheduleAutoSave = () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current)
+      }
+      autoSaveTimeoutRef.current = setTimeout(() => {
+        if (title?.trim() && content?.trim()) {
+          handleSaveSnippet(true) // true = silent auto-save
+        }
+      }, 1000) // Auto-save after 1 second of inactivity
+    }
+
+    // Check if there are actual changes compared to last saved state
+    const hasActualChanges = () => {
+      const lastSaved = lastSavedStateRef.current
+      const currentId = currentSnippet?.id || null
+
+      // If this is a new snippet, check if there's any content
+      if (!currentSnippet) {
+        return !!(title?.trim() || content?.trim())
+      }
+
+      // If switching to a different snippet, don't auto-save
+      if (lastSaved.id !== currentId) {
+        return false
+      }
+
+      // Check if any field actually changed
+      return (
+        title !== lastSaved.title ||
+        content !== lastSaved.content ||
+        language !== lastSaved.language ||
+        tags !== lastSaved.tags ||
+        description !== lastSaved.description
+      )
+    }
+
+    // Update last saved state when snippet changes
+    if (currentSnippet) {
+      lastSavedStateRef.current = {
+        id: currentSnippet.id,
+        title: currentSnippet.title,
+        content: currentSnippet.content,
+        language: currentSnippet.language,
+        tags: currentSnippet.tags || '',
+        description: currentSnippet.description || ''
+      }
+    } else {
+      // Reset for new snippet
+      lastSavedStateRef.current = {
+        id: null,
+        title: '',
+        content: '',
+        language: 'javascript',
+        tags: '',
+        description: ''
+      }
+    }
+
+    // Only schedule auto-save if there are actual changes
+    if (hasActualChanges()) {
+      scheduleAutoSave()
+    }
+
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current)
+      }
+    }
   }, [title, content, language, tags, description, currentSnippet])
 
   // Keyboard shortcuts
@@ -159,23 +236,12 @@ function App() {
         handleNewSnippet()
         return
       }
-      // Cmd/Ctrl + S for save (when editing)
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-        e.preventDefault()
-        e.stopPropagation()
-        console.log('Save shortcut triggered, isEditing:', isEditing)
-        if (isEditing && saveSnippetRef.current) {
-          console.log('Calling save function from ref')
-          saveSnippetRef.current()
-        }
-        return
-      }
-      // Escape to cancel editing or close modals (priority: modals first, then editing)
+      // Escape to close modals
       if (e.key === 'Escape') {
         if (showShortcutsHelp) {
           setShowShortcutsHelp(false)
-        } else if (isEditing) {
-          setIsEditing(false)
+        } else if (isSearchModalOpen) {
+          setIsSearchModalOpen(false)
         }
         return
       }
@@ -192,11 +258,11 @@ function App() {
         return
       }
     }
-    
+
     window.addEventListener('keydown', handleKeyDown, true)
     return () => window.removeEventListener('keydown', handleKeyDown, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditing, sidebarCollapsed, showShortcutsHelp])
+  }, [sidebarCollapsed, showShortcutsHelp, isSearchModalOpen])
 
 
   const loadSnippets = async () => {
@@ -287,7 +353,6 @@ function App() {
 
   const handleEditSnippet = (snippet) => {
     setCurrentSnippet(snippet)
-    setIsEditing(true)
     setTitle(snippet.title)
     setLanguage(snippet.language)
     setTags(snippet.tags || '')
@@ -295,17 +360,21 @@ function App() {
     setContent(snippet.content)
   }
 
-  const handleSaveSnippet = async () => {
+  const handleSaveSnippet = async (silent = false) => {
     console.log('handleSaveSnippet called', { title, content: content?.substring(0, 50) })
-    
+
     if (!title?.trim()) {
-      console.log('Title validation failed')
-      showToast('Title is required', 'error')
+      if (!silent) {
+        console.log('Title validation failed')
+        showToast('Title is required', 'error')
+      }
       return
     }
     if (!content?.trim()) {
-      console.log('Content validation failed')
-      showToast('Content is required', 'error')
+      if (!silent) {
+        console.log('Content validation failed')
+        showToast('Content is required', 'error')
+      }
       return
     }
 
@@ -322,55 +391,111 @@ function App() {
     try {
       const savedTitle = title.trim()
       const savedId = currentSnippet?.id
-      
+
       console.log('Saving snippet...', { savedId, savedTitle })
-      
+
       if (currentSnippet) {
         await invoke('update_snippet', { id: currentSnippet.id, snippet })
-        showToast('Snippet updated successfully', 'success')
+        if (!silent) {
+          showToast('Snippet updated successfully', 'success')
+        }
       } else {
         await invoke('create_snippet', { snippet })
-        showToast('Snippet created successfully', 'success')
+        if (!silent) {
+          showToast('Snippet created successfully', 'success')
+        }
       }
-      
+
       // Mark as having unsynced changes
       setHasUnsyncedChanges(true)
-      
+
       await loadSnippets()
-      
-      // Delay unmounting the editor to allow it to cleanup properly
-      setTimeout(() => {
-        setIsEditing(false)
-        
-        // Find and select the saved snippet
-        setSnippets(prev => {
-          const savedSnippet = prev.find(s => 
-            savedId ? s.id === savedId : s.title === savedTitle
-          )
-          if (savedSnippet) {
-            setCurrentSnippet(savedSnippet)
+
+      // Find and select the saved snippet
+      setSnippets(prev => {
+        const savedSnippet = prev.find(s =>
+          savedId ? s.id === savedId : s.title === savedTitle
+        )
+        if (savedSnippet) {
+          setCurrentSnippet(savedSnippet)
+
+          // Update last saved state to prevent immediate re-save
+          lastSavedStateRef.current = {
+            id: savedSnippet.id,
+            title: savedSnippet.title,
+            content: savedSnippet.content,
+            language: savedSnippet.language,
+            tags: savedSnippet.tags || '',
+            description: savedSnippet.description || ''
           }
-          return prev
-        })
-      }, 50)
+        }
+        return prev
+      })
     } catch (error) {
       console.error('Failed to save snippet:', error)
-      showToast('Failed to save snippet', 'error')
+      if (!silent) {
+        showToast('Failed to save snippet', 'error')
+      }
     }
   }
 
+  // Check if current snippet has unsaved changes
+  const hasUnsavedChanges = () => {
+    if (!currentSnippet) {
+      // For new snippets, check if there's any content
+      return !!(title?.trim() || content?.trim())
+    }
+    // For existing snippets, check if any field has changed
+    return (
+      title !== currentSnippet.title ||
+      content !== currentSnippet.content ||
+      language !== currentSnippet.language ||
+      tags !== (currentSnippet.tags || '') ||
+      description !== (currentSnippet.description || '')
+    )
+  }
+
+  // Show unsaved changes warning
+  const showUnsavedChangesWarning = () => {
+    return new Promise((resolve) => {
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Unsaved Changes',
+        message: 'You have unsaved changes. Do you want to save them before continuing?',
+        onConfirm: async () => {
+          await handleSaveSnippet()
+          resolve(true)
+        },
+        onCancel: () => {
+          resolve(false)
+        }
+      })
+    })
+  }
+
   const handleDeleteSnippet = async (snippet) => {
+    // Check if there are unsaved changes in the current snippet
+    const hasUnsavedChanges = currentSnippet?.id === snippet.id && (
+      title !== snippet.title ||
+      content !== snippet.content ||
+      language !== snippet.language ||
+      tags !== (snippet.tags || '') ||
+      description !== (snippet.description || '')
+    )
+
     setConfirmDialog({
       isOpen: true,
-      title: 'Delete Snippet',
-      message: `Are you sure you want to delete "${snippet.title}"? This will be deleted from both local and cloud storage.`,
+      title: hasUnsavedChanges ? 'Unsaved Changes' : 'Delete Snippet',
+      message: hasUnsavedChanges
+        ? `You have unsaved changes in "${snippet.title}". Are you sure you want to delete it? These changes will be lost.`
+        : `Are you sure you want to delete "${snippet.title}"? This will be deleted from both local and cloud storage.`,
       onConfirm: async () => {
         setIsDeletingSnippet(true)
         setDeleteError(null)
         try {
           // Delete locally first
           await invoke('delete_snippet', { id: snippet.id })
-          
+
           // Delete from cloud if user is signed in
           if (isSignedIn && user?.email) {
             try {
@@ -384,14 +509,18 @@ function App() {
           } else {
             showToast('Snippet deleted locally', 'success')
           }
-          
+
           // Mark as having unsynced changes
           setHasUnsyncedChanges(true)
-          
+
           await loadSnippets()
           if (currentSnippet?.id === snippet.id) {
             setCurrentSnippet(null)
-            setIsEditing(false)
+            setTitle('')
+            setContent('')
+            setLanguage('javascript')
+            setTags('')
+            setDescription('')
           }
         } catch (error) {
           console.error('Failed to delete snippet:', error)
@@ -444,9 +573,15 @@ function App() {
         isLoadingModel={isLoadingModel}
         onLoadModel={handleLoadModel}
         filteredSnippets={searchResults}
-        onSelectSnippet={(snippet) => {
-          setCurrentSnippet(snippet)
-          setIsEditing(false)
+        onSelectSnippet={async (snippet) => {
+          if (hasUnsavedChanges()) {
+            const shouldSave = await showUnsavedChangesWarning()
+            if (!shouldSave) {
+              // User cancelled, don't switch snippets
+              return
+            }
+          }
+          handleEditSnippet(snippet)
           setIsSearchModalOpen(false)
         }}
         isMac={isMac}
@@ -501,9 +636,15 @@ function App() {
             <SnippetsPanel
               snippets={filteredSnippets}
               currentSnippet={currentSnippet}
-              onSnippetClick={(snippet) => {
-                setCurrentSnippet(snippet)
-                setIsEditing(false)
+              onSnippetClick={async (snippet) => {
+                if (hasUnsavedChanges()) {
+                  const shouldSave = await showUnsavedChangesWarning()
+                  if (!shouldSave) {
+                    // User cancelled, don't switch snippets
+                    return
+                  }
+                }
+                handleEditSnippet(snippet)
               }}
               onNewSnippet={handleNewSnippet}
               onDeleteSnippet={handleDeleteSnippet}
@@ -574,33 +715,31 @@ function App() {
             >
               {sidebarCollapsed ? <PanelLeft className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
             </Button>
-            
+
+            {/* Auto-save indicator */}
+            {currentSnippet || (title && content) ? (
+              <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-muted/50">
+                <Sparkles className="h-3 w-3 text-primary" />
+                <span className="text-[10px] text-muted-foreground">
+                  Auto-save enabled
+                </span>
+                {hasUnsavedChanges() && (
+                  <span className="text-[10px] text-yellow-600 dark:text-yellow-400">
+                    • Unsaved changes
+                  </span>
+                )}
+              </div>
+            ) : null}
+
             {/* Spacer to push buttons to the right */}
             <div className="flex-1"></div>
-            
-            {/* Action Buttons - Change based on mode */}
-            {isEditing ? (
-              // Edit/Create Mode - Show Save and Cancel
-              <div className="flex items-center gap-1.5">
-                <Button variant="outline" size="sm" className="h-7 px-2 text-[10px]" onClick={() => setIsEditing(false)}>
-                  <X className="h-3 w-3 mr-1" />
-                  Cancel
-                </Button>
-                <Button size="sm" className="h-7 px-2 text-[10px]" onClick={handleSaveSnippet}>
-                  <Save className="h-3 w-3 mr-1" />
-                  Save
-                </Button>
-              </div>
-            ) : currentSnippet ? (
-              // View Mode - Show Copy, Edit, Delete
+
+            {/* Action Buttons - Only for current snippet */}
+            {currentSnippet ? (
               <div className="flex items-center gap-1.5">
                 <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px]" onClick={() => handleCopyCode(currentSnippet.content)}>
                   <Copy className="h-3 w-3 mr-1" />
                   Copy
-                </Button>
-                <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px]" onClick={() => handleEditSnippet(currentSnippet)}>
-                  <Edit className="h-3 w-3 mr-1" />
-                  Edit
                 </Button>
                 <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] text-destructive hover:text-destructive" onClick={() => handleDeleteSnippet(currentSnippet)}>
                   <Trash2 className="h-3 w-3 mr-1" />
@@ -611,7 +750,7 @@ function App() {
           </div>
 
           {/* Content Area */}
-          {!currentSnippet && !isEditing ? (
+          {!currentSnippet && !title && !content ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
                 <FileCode className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
@@ -628,33 +767,32 @@ function App() {
                 </p>
               </div>
             </div>
-          ) : isEditing ? (
-            // Editor Mode - Clean editor only for both new and edit
+          ) : (
+            // Always Edit Mode
             <div className="flex-1 flex flex-col overflow-hidden">
-              {/* Just the Editor */}
               <div className="flex-1 overflow-auto p-2">
                 <TiptapEditor
-                  content={content}
+                  content={content || ''}
                   onChange={(newContent) => {
                     setContent(newContent)
                     // Auto-detect title from first heading or first line
                     const tempDiv = document.createElement('div')
                     tempDiv.innerHTML = newContent
-                    
+
                     // Try to get first heading
                     const firstHeading = tempDiv.querySelector('h1, h2, h3, h4, h5, h6')
                     if (firstHeading && firstHeading.textContent?.trim()) {
                       setTitle(firstHeading.textContent.trim().substring(0, 100))
                       return
                     }
-                    
+
                     // Otherwise get first paragraph or line
                     const firstParagraph = tempDiv.querySelector('p')
                     if (firstParagraph && firstParagraph.textContent?.trim()) {
                       setTitle(firstParagraph.textContent.trim().substring(0, 100))
                       return
                     }
-                    
+
                     // Fallback to first non-empty text
                     const allText = tempDiv.textContent?.trim() || ''
                     const firstLine = allText.split('\n').find(line => line.trim()) || ''
@@ -664,18 +802,6 @@ function App() {
                   }}
                   editable={true}
                   autoFocus={true}
-                />
-              </div>
-            </div>
-          ) : (
-            // View Mode
-            <div className="flex-1 flex flex-col overflow-hidden">
-              {/* View Content */}
-              <div className="flex-1 overflow-auto p-2">
-                <TiptapEditor
-                  content={currentSnippet.content}
-                  onChange={() => {}}
-                  editable={false}
                 />
               </div>
             </div>
@@ -751,12 +877,8 @@ function App() {
                 <h3 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Editor</h3>
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
-                    <span className="text-xs">Save snippet</span>
-                    <kbd className="px-2 py-1 text-[10px] font-medium bg-muted border border-border rounded">{isMac ? '⌘' : 'Ctrl'} S</kbd>
-                  </div>
-                  <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
-                    <span className="text-xs">Cancel editing</span>
-                    <kbd className="px-2 py-1 text-[10px] font-medium bg-muted border border-border rounded">Esc</kbd>
+                    <span className="text-xs">Auto-save enabled</span>
+                    <span className="text-[10px] text-muted-foreground">Changes save automatically</span>
                   </div>
                 </div>
               </div>
@@ -792,13 +914,18 @@ function App() {
       {/* Confirmation Dialog */}
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
-        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onClose={() => {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }))
+          if (confirmDialog.onCancel) {
+            confirmDialog.onCancel()
+          }
+        }}
         onConfirm={confirmDialog.onConfirm}
         title={confirmDialog.title}
         message={confirmDialog.message}
-        confirmText="Delete"
+        confirmText={confirmDialog.confirmText || 'Confirm'}
         cancelText="Cancel"
-        variant="destructive"
+        variant={confirmDialog.variant || 'default'}
       />
 
       <style>{`
