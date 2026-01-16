@@ -305,7 +305,8 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
         spellcheck: 'false',
         autocomplete: 'off',
         autocorrect: 'off',
-        autocapitalize: 'off'
+        autocapitalize: 'off',
+        'data-tippy-root': 'false'
       }
     }
   })
@@ -465,8 +466,14 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
       if (!isMountedRef.current || editor.isDestroyed) return
       try {
         const { from, to, empty } = editor.state.selection
-      
+
       if (empty || !editable) {
+        setShowBubbleMenu(false)
+        return
+      }
+
+      // Don't show bubble menu if selection is inside a code block
+      if (editor.isActive('codeBlock')) {
         setShowBubbleMenu(false)
         return
       }
@@ -480,7 +487,7 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
 
       const range = selection.getRangeAt(0)
       const rect = range.getBoundingClientRect()
-      
+
       if (rect.width === 0 && rect.height === 0) {
         setShowBubbleMenu(false)
         return
@@ -489,16 +496,16 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
       // Position the bubble menu above the selection
       const menuWidth = 400 // approximate width
       const menuHeight = 40 // approximate height
-      
+
       let top = rect.top + window.scrollY - menuHeight - 8
       let left = rect.left + window.scrollX + (rect.width / 2) - (menuWidth / 2)
-      
+
       // Keep menu on screen
       if (left < 10) left = 10
       if (left + menuWidth > window.innerWidth - 10) {
         left = window.innerWidth - menuWidth - 10
       }
-      
+
       if (top < 10) {
         // If no room above, show below
         top = rect.bottom + window.scrollY + 8
@@ -663,7 +670,6 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           onClick={() => editor.chain().focus().toggleBold().run()}
           disabled={!editor.can().chain().focus().toggleBold().run()}
           data-active={editor.isActive('bold')}
-          title="Bold (Ctrl+B)"
         >
           <Bold className="h-4 w-4" />
         </Button>
@@ -675,7 +681,6 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           onClick={() => editor.chain().focus().toggleItalic().run()}
           disabled={!editor.can().chain().focus().toggleItalic().run()}
           data-active={editor.isActive('italic')}
-          title="Italic (Ctrl+I)"
         >
           <Italic className="h-4 w-4" />
         </Button>
@@ -686,11 +691,10 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           className="h-8 w-8 p-0"
           onClick={() => editor.chain().focus().toggleUnderline().run()}
           data-active={editor.isActive('underline')}
-          title="Underline (Ctrl+U)"
         >
           <UnderlineIcon className="h-4 w-4" />
         </Button>
-        
+
         <Button
           variant="ghost"
           size="sm"
@@ -698,11 +702,10 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           onClick={() => editor.chain().focus().toggleStrike().run()}
           disabled={!editor.can().chain().focus().toggleStrike().run()}
           data-active={editor.isActive('strike')}
-          title="Strikethrough"
         >
           <Strikethrough className="h-4 w-4" />
         </Button>
-        
+
         <Button
           variant="ghost"
           size="sm"
@@ -710,7 +713,6 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           onClick={() => editor.chain().focus().toggleCode().run()}
           disabled={!editor.can().chain().focus().toggleCode().run()}
           data-active={editor.isActive('code')}
-          title="Inline Code"
         >
           <Code2 className="h-4 w-4" />
         </Button>
@@ -721,7 +723,6 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           className="h-8 w-8 p-0"
           onClick={() => editor.chain().focus().toggleHighlight().run()}
           data-active={editor.isActive('highlight')}
-          title="Highlight"
         >
           <Highlighter className="h-4 w-4" />
         </Button>
@@ -735,18 +736,16 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           className="h-8 w-8 p-0"
           onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
           data-active={editor.isActive('heading', { level: 1 })}
-          title="Heading 1"
         >
           <Heading1 className="h-4 w-4" />
         </Button>
-        
+
         <Button
           variant="ghost"
           size="sm"
           className="h-8 w-8 p-0"
           onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
           data-active={editor.isActive('heading', { level: 2 })}
-          title="Heading 2"
         >
           <Heading2 className="h-4 w-4" />
         </Button>
@@ -757,7 +756,6 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           className="h-8 w-8 p-0"
           onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
           data-active={editor.isActive('heading', { level: 3 })}
-          title="Heading 3"
         >
           <Heading3 className="h-4 w-4" />
         </Button>
@@ -771,7 +769,6 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           className="h-8 w-8 p-0"
           onClick={() => editor.chain().focus().setTextAlign('left').run()}
           data-active={editor.isActive({ textAlign: 'left' })}
-          title="Align Left"
         >
           <AlignLeft className="h-4 w-4" />
         </Button>
@@ -782,7 +779,6 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           className="h-8 w-8 p-0"
           onClick={() => editor.chain().focus().setTextAlign('center').run()}
           data-active={editor.isActive({ textAlign: 'center' })}
-          title="Align Center"
         >
           <AlignCenter className="h-4 w-4" />
         </Button>
@@ -793,7 +789,6 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           className="h-8 w-8 p-0"
           onClick={() => editor.chain().focus().setTextAlign('right').run()}
           data-active={editor.isActive({ textAlign: 'right' })}
-          title="Align Right"
         >
           <AlignRight className="h-4 w-4" />
         </Button>
@@ -807,18 +802,16 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           className="h-8 w-8 p-0"
           onClick={() => editor.chain().focus().toggleBulletList().run()}
           data-active={editor.isActive('bulletList')}
-          title="Bullet List"
         >
           <List className="h-4 w-4" />
         </Button>
-        
+
         <Button
           variant="ghost"
           size="sm"
           className="h-8 w-8 p-0"
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
           data-active={editor.isActive('orderedList')}
-          title="Numbered List"
         >
           <ListOrdered className="h-4 w-4" />
         </Button>
@@ -829,7 +822,6 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           className="h-8 w-8 p-0"
           onClick={() => editor.chain().focus().toggleTaskList().run()}
           data-active={editor.isActive('taskList')}
-          title="Task List"
         >
           <ListTodo className="h-4 w-4" />
         </Button>
@@ -840,18 +832,16 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           className="h-8 w-8 p-0"
           onClick={insertCodeBlock}
           data-active={isCodeBlock}
-          title="Code Block"
         >
           <FileCode2 className="h-4 w-4" />
         </Button>
-        
+
         <Button
           variant="ghost"
           size="sm"
           className="h-8 w-8 p-0"
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
           data-active={editor.isActive('blockquote')}
-          title="Quote"
         >
           <MessageSquareQuote className="h-4 w-4" />
         </Button>
@@ -866,7 +856,7 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           onClick={() => {
             const { from, to } = editor.state.selection
             const text = editor.state.doc.textBetween(from, to, '')
-            
+
             if (!text) {
               alert('Please select some text first')
               return
@@ -877,18 +867,17 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
             if (selection && selection.rangeCount > 0) {
               const range = selection.getRangeAt(0)
               const rect = range.getBoundingClientRect()
-              
+
               // Position below the selection
               setLinkInputPosition({
                 top: rect.bottom + window.scrollY + 8,
                 left: rect.left + window.scrollX
               })
             }
-            
+
             setShowLinkInput(!showLinkInput)
           }}
           data-active={editor.isActive('link')}
-          title="Insert Link"
         >
           <Link2 className="h-4 w-4" />
         </Button>
@@ -898,7 +887,6 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           size="sm"
           className="h-8 w-8 p-0"
           onClick={() => setShowImageInput(!showImageInput)}
-          title="Insert Image"
         >
           <ImagePlus className="h-4 w-4" />
         </Button>
@@ -908,7 +896,6 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           size="sm"
           className="h-8 w-8 p-0"
           onClick={insertTable}
-          title="Insert Table"
         >
           <Table2 className="h-4 w-4" />
         </Button>
@@ -918,7 +905,6 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           size="sm"
           className="h-8 w-8 p-0"
           onClick={() => editor.chain().focus().setHorizontalRule().run()}
-          title="Horizontal Rule"
         >
           <Minus className="h-4 w-4" />
         </Button>
@@ -932,18 +918,16 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           className="h-8 w-8 p-0"
           onClick={() => editor.chain().focus().undo().run()}
           disabled={!editor.can().chain().focus().undo().run()}
-          title="Undo (Ctrl+Z)"
         >
           <Undo2 className="h-4 w-4" />
         </Button>
-        
+
         <Button
           variant="ghost"
           size="sm"
           className="h-8 w-8 p-0"
           onClick={() => editor.chain().focus().redo().run()}
           disabled={!editor.can().chain().focus().redo().run()}
-          title="Redo (Ctrl+Y)"
         >
           <Redo2 className="h-4 w-4" />
         </Button>
@@ -1003,32 +987,29 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
                 </a>
               </div>
               <div className="flex gap-1 justify-center">
-                <Button 
-                  size="sm" 
-                  variant="outline" 
+                <Button
+                  size="sm"
+                  variant="outline"
                   className="h-8 w-8 p-0"
                   onClick={() => openLink(currentLinkUrl)}
-                  title="Open link"
                 >
                   <ExternalLink className="h-4 w-4" />
                 </Button>
                 {editable && (
                   <>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
+                    <Button
+                      size="sm"
+                      variant="outline"
                       className="h-8 w-8 p-0"
                       onClick={() => setIsEditingLink(true)}
-                      title="Edit link"
                     >
                       <Edit3 className="h-4 w-4" />
                     </Button>
-                    <Button 
-                      size="sm" 
-                      variant="destructive" 
+                    <Button
+                      size="sm"
+                      variant="destructive"
                       className="h-8 w-8 p-0"
                       onClick={removeLink}
-                      title="Remove link"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

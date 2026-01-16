@@ -471,3 +471,42 @@ button[data-active="true"] {
     visibility: hidden;
   }
 }
+
+/* Disable tooltips for code blocks */
+.code-block-wrapper,
+.code-block-wrapper * {
+  pointer-events: auto !important;
+}
+
+/* Prevent tippy tooltips on code blocks */
+.code-block-wrapper [data-tippy-root],
+.code-block-wrapper [data-tippy-instant] {
+  display: none !important;
+}
+
+/* Disable any tooltip functionality on code blocks */
+.code-block-wrapper pre,
+.code-block-wrapper code,
+.code-block-wrapper .node-view-content {
+  pointer-events: auto !important;
+}
+
+/* Disable selection tooltips in code blocks */
+.code-block-wrapper pre::selection,
+.code-block-wrapper code::selection,
+.code-block-wrapper .node-view-content::selection {
+  background: #264f78;
+}
+
+/* Disable any browser native tooltips */
+.code-block-wrapper [title],
+.code-block-wrapper pre[title],
+.code-block-wrapper code[title] {
+  cursor: text !important;
+}
+
+/* Ensure text selection in code blocks doesn't show popup menus */
+.ProseMirror-selectednode:has(pre),
+.ProseMirror-selectednode:has(code) {
+  outline: none !important;
+}
