@@ -16,11 +16,12 @@ pub struct AppState {
 
 fn main() {
     let db = database::Database::new().expect("Failed to initialize database");
-    
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(AppState {
             db: Mutex::new(db),
             search_engine: Mutex::new(None),
@@ -44,6 +45,7 @@ fn main() {
             commands::delete_clipboard_entry,
             commands::clear_clipboard_history,
             commands::update_clipboard_entry,
+            commands::register_clipboard_hotkey,
             auth::store_user_token,
             auth::get_user_token,
             auth::clear_user_tokens,

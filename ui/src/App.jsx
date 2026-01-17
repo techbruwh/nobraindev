@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 import { Plus, Search, FileCode, X, Edit, Trash2, Copy, Save, Brain, Download, Sparkles, CheckCircle, AlertCircle, Info, PanelLeftClose, PanelLeft, Keyboard, Code, Braces, RefreshCw, Cloud, User } from 'lucide-react'
 import { useSupabaseAuth } from '@/lib/supabase-auth'
 import { syncService } from '@/lib/sync'
@@ -9,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { SearchBar } from '@/components/ui/searchbar'
 import { SearchModal } from '@/components/ui/searchmodal'
+import { ClipboardPopup } from '@/components/ui/clipboardpopup'
 import { ConfirmDialog } from '@/components/ui/confirmdialog'
 import { MenuSidebar } from '@/components/ui/menusidebar'
 import { SnippetsPanel } from '@/components/ui/snippetspanel'
@@ -28,6 +30,10 @@ function App() {
   // Search Modal state - separate from sidebar filtering
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
   const [searchResults, setSearchResults] = useState([])
+
+  // Clipboard Popup state
+  const [isClipboardPopupOpen, setIsClipboardPopupOpen] = useState(false)
+
   const [isMac, setIsMac] = useState(false)
   
   // AI Model state
@@ -104,6 +110,43 @@ function App() {
   useEffect(() => {
     loadSnippets()
     checkModelStatus()
+  }, [])
+
+  // Register global clipboard hotkey and listen for events
+  useEffect(() => {
+    let unlistenFn = null
+
+    const registerGlobalShortcut = async () => {
+      try {
+        console.log('🔄 [Frontend] Attempting to register global clipboard shortcut...')
+
+        // Register the global shortcut with the system
+        await invoke('register_clipboard_hotkey')
+        console.log('✅ [Frontend] Global clipboard shortcut registered successfully!')
+
+        // Listen for the hotkey event from Tauri
+        const unlisten = await listen('clipboard-hotkey', (event) => {
+          console.log('🎯 [Frontend] Clipboard hotkey event received!', event)
+          // Open the clipboard popup when the hotkey is pressed
+          setIsClipboardPopupOpen(true)
+        })
+
+        unlistenFn = unlisten
+        console.log('✅ [Frontend] Clipboard hotkey event listener registered')
+      } catch (error) {
+        console.error('❌ [Frontend] Failed to register global clipboard shortcut:', error)
+      }
+    }
+
+    registerGlobalShortcut()
+
+    // Cleanup function
+    return () => {
+      if (unlistenFn) {
+        console.log('🧹 [Frontend] Cleaning up clipboard hotkey listener')
+        unlistenFn()
+      }
+    }
   }, [])
 
   // Always show all snippets in sidebar (no filtering)
@@ -242,6 +285,8 @@ function App() {
           setShowShortcutsHelp(false)
         } else if (isSearchModalOpen) {
           setIsSearchModalOpen(false)
+        } else if (isClipboardPopupOpen) {
+          setIsClipboardPopupOpen(false)
         }
         return
       }
@@ -262,7 +307,7 @@ function App() {
     window.addEventListener('keydown', handleKeyDown, true)
     return () => window.removeEventListener('keydown', handleKeyDown, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sidebarCollapsed, showShortcutsHelp, isSearchModalOpen])
+  }, [sidebarCollapsed, showShortcutsHelp, isSearchModalOpen, isClipboardPopupOpen])
 
 
   const loadSnippets = async () => {
@@ -587,6 +632,15 @@ function App() {
         isMac={isMac}
       />
 
+      {/* Clipboard Popup */}
+      <ClipboardPopup
+        isOpen={isClipboardPopupOpen}
+        onClose={() => {
+          setIsClipboardPopupOpen(false)
+        }}
+        showToast={showToast}
+      />
+
       {/* Toast Notification */}
       {toast && (
         <div 
@@ -853,6 +907,10 @@ function App() {
               <div>
                 <h3 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">General</h3>
                 <div className="space-y-1.5">
+                  <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
+                    <span className="text-xs">Open clipboard</span>
+                    <kbd className="px-2 py-1 text-[10px] font-medium bg-muted border border-border rounded">{isMac ? '⌘' : 'Ctrl'} Shift C</kbd>
+                  </div>
                   <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
                     <span className="text-xs">Search snippets</span>
                     <kbd className="px-2 py-1 text-[10px] font-medium bg-muted border border-border rounded">{isMac ? '⌘' : 'Ctrl'} K</kbd>

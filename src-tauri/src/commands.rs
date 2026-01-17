@@ -284,3 +284,66 @@ pub fn update_clipboard_entry(
     db.update_clipboard_entry(id, &content, &source, &category, &updated_at)
         .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub fn register_clipboard_hotkey(app_handle: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Emitter;
+    use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+
+    // List of fallback shortcuts to try, in order of preference
+    let shortcuts_to_try = vec![
+        "Cmd+Shift+C",  // Most unique and macOS-specific
+        "Cmd+Option+C",
+        "Cmd+Ctrl+C",
+        "F6",
+        "F7",
+    ];
+
+    let mut shortcuts = app_handle.global_shortcut();
+    let mut registered_shortcut: Option<String> = None;
+
+    for shortcut_str in shortcuts_to_try {
+        println!("🔑 Attempting to register global shortcut: {}", shortcut_str);
+
+        // Check if already registered to avoid duplicates
+        if shortcuts.is_registered(shortcut_str) {
+            println!("ℹ️  Shortcut '{}' is already registered, trying next...", shortcut_str);
+            continue;
+        }
+
+        // Try to register the global shortcut with event handler in one call
+        let app_handle_clone = app_handle.clone();
+        let shortcut_str_clone = shortcut_str.to_string();
+
+        match shortcuts.on_shortcut(shortcut_str, move |_app, _shortcut, event| {
+            println!("⚡ Shortcut event received! State: {:?}", event.state);
+            if event.state == ShortcutState::Pressed {
+                println!("🎯 Global shortcut '{}' pressed!", shortcut_str_clone);
+                // Emit an event to the frontend to open the clipboard popup
+                match app_handle_clone.emit("clipboard-hotkey", ()) {
+                    Ok(_) => println!("✅ Emitted clipboard-hotkey event to frontend"),
+                    Err(e) => println!("❌ Failed to emit clipboard-hotkey event: {}", e),
+                }
+            }
+        }) {
+            Ok(_) => {
+                println!("✅ Successfully registered global shortcut with listener: {}", shortcut_str);
+                registered_shortcut = Some(shortcut_str.to_string());
+                break;
+            }
+            Err(e) => {
+                println!("⚠️  Failed to register shortcut '{}': {}", shortcut_str, e);
+                // Try the next shortcut in the list
+            }
+        }
+    }
+
+    let _shortcut_str = registered_shortcut.ok_or_else(|| {
+        "Failed to register any global shortcut. Tried: Cmd+Shift+C, Cmd+Option+C, Cmd+Ctrl+C, F6, F7. \
+         You may need to grant accessibility permissions or close conflicting applications.".to_string()
+    })?;
+
+    println!("✅ Global clipboard hotkey registration complete");
+
+    Ok(())
+}

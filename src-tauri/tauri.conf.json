@@ -28,8 +28,13 @@
   },
   "app": {
     "withGlobalTauri": false,
+    "security": {
+      "csp": "default-src 'self' ipc: tauri:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' ipc: tauri: https://*.supabase.co https://srkjunbwdclxymzwvpmt.supabase.co; img-src 'self' data: https: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; worker-src 'self' blob:;",
+      "devCsp": null
+    },
     "windows": [
       {
+        "label": "main",
         "fullscreen": false,
         "resizable": true,
         "title": "NoBrainDev",
@@ -38,11 +43,7 @@
         "minWidth": 800,
         "minHeight": 600
       }
-    ],
-    "security": {
-      "csp": "default-src 'self' ipc: tauri:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' ipc: tauri: https://*.supabase.co https://srkjunbwdclxymzwvpmt.supabase.co; img-src 'self' data: https: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; worker-src 'self' blob:;",
-      "devCsp": null
-    }
+    ]
   },
   "plugins": {
     "shell": {
