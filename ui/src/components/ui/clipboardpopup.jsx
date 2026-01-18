@@ -3,6 +3,7 @@ import { Search, FilePlus, Clock, FileCode, Check, ChevronDown } from 'lucide-re
 import { ClipboardService } from '@/lib/clipboard'
 import { Button } from '@/components/ui/button'
 import { listen } from '@tauri-apps/api/event'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 
 const PAGE_SIZE = 20
 
@@ -71,6 +72,19 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
   }, [isOpen])
+
+  // Close popup when it loses focus (click outside)
+  useEffect(() => {
+    const handleBlur = () => {
+      if (isOpen) {
+        console.log('🔲 Window lost focus - closing popup')
+        onClose()
+      }
+    }
+
+    window.addEventListener('blur', handleBlur)
+    return () => window.removeEventListener('blur', handleBlur)
+  }, [isOpen, onClose])
 
   // Listen for clipboard popup triggered event (Cmd+Shift+C pressed)
   useEffect(() => {
