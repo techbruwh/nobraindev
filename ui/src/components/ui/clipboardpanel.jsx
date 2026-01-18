@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, forwardRef, useImperativeHandle } from 'react'
 import { Clipboard, Trash2, Copy, FileCode, Search, RefreshCw, AlertCircle, Cloud, CheckCircle, Loader2, ArrowUp, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -7,7 +7,7 @@ import { clipboardService } from '@/lib/clipboard'
 import { useSupabaseAuth } from '@/lib/supabase-auth'
 import { syncService } from '@/lib/sync'
 
-export function ClipboardPanel({ onConvertToSnippet, onClipboardChanged, hasUnsyncedClipboard, onClipboardSyncComplete }) {
+export const ClipboardPanel = forwardRef(({ onConvertToSnippet, onClipboardChanged, hasUnsyncedClipboard, onClipboardSyncComplete }, ref) => {
   const { user } = useSupabaseAuth()
   const isSignedIn = !!user
   const [history, setHistory] = useState([])
@@ -17,17 +17,19 @@ export function ClipboardPanel({ onConvertToSnippet, onClipboardChanged, hasUnsy
   const [error, setError] = useState(null)
   const [selectedEntry, setSelectedEntry] = useState(null)
   const [showConvertModal, setShowConvertModal] = useState(false)
-  const [convertData, setConvertData] = useState({
-    title: '',
-    language: 'text',
-    tags: '',
-  })
-  
+
   // Sync state
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncStatus, setSyncStatus] = useState(null)
   const [lastSyncTime, setLastSyncTime] = useState(null)
   const [syncApproval, setSyncApproval] = useState(null)
+
+  // Expose refreshClipboard function to parent
+  useImperativeHandle(ref, () => ({
+    refreshClipboard: () => {
+      handleScanClipboard()
+    }
+  }))
 
   // Load clipboard history on mount
   useEffect(() => {
@@ -155,27 +157,43 @@ export function ClipboardPanel({ onConvertToSnippet, onClipboardChanged, hasUnsy
 
   const handleConvertClick = (entry) => {
     setSelectedEntry(entry)
-    setConvertData({
-      title: entry.content.substring(0, 50),
-      language: 'text',
-      tags: '',
-    })
     setShowConvertModal(true)
   }
 
   const handleConvertSubmit = async () => {
+    if (!selectedEntry) return
+
     try {
+      // Generate smart defaults for snippet data
+      const title = selectedEntry.content
+        .split('\n')[0]
+        .substring(0, 50)
+        .trim() || 'Clipboard Snippet'
+
+      const languageMap = {
+        'json': 'json',
+        'sql': 'sql',
+        'javascript': 'javascript',
+        'typescript': 'typescript',
+        'python': 'python',
+        'html': 'html',
+        'css': 'css',
+        'code': 'text',
+        'url': 'text',
+        'general': 'text',
+      }
+
       await clipboardService.convertToSnippet(selectedEntry.id, {
-        title: convertData.title,
-        language: convertData.language,
+        title,
+        language: languageMap[selectedEntry.category?.toLowerCase()] || 'text',
         content: selectedEntry.content,
-        tags: convertData.tags.split(',').filter(t => t.trim()),
-        description: `Converted from clipboard - ${new Date().toLocaleDateString()}`,
+        tags: [],
+        description: `Converted from clipboard (${selectedEntry.category})`,
       })
-      
+
       // Notify parent component
       onConvertToSnippet?.()
-      
+
       setShowConvertModal(false)
       setSelectedEntry(null)
     } catch (err) {
@@ -460,69 +478,22 @@ export function ClipboardPanel({ onConvertToSnippet, onClipboardChanged, hasUnsy
         </Button>
       </div>
 
-      {/* Convert to Snippet Modal */}
+      {/* Convert to Snippet Confirmation Modal */}
       {showConvertModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background border rounded-lg p-4 max-w-md w-full">
-            <h3 className="text-sm font-semibold mb-3">Convert to Snippet</h3>
-
-            <div className="space-y-3">
-              <div>
-                <label className="text-[10px] font-medium">Title</label>
-                <Input
-                  type="text"
-                  value={convertData.title}
-                  onChange={(e) =>
-                    setConvertData({ ...convertData, title: e.target.value })
-                  }
-                  className="text-xs h-8 mt-1"
-                  placeholder="Snippet title"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] font-medium">Language</label>
-                <select
-                  value={convertData.language}
-                  onChange={(e) =>
-                    setConvertData({ ...convertData, language: e.target.value })
-                  }
-                  className="w-full text-xs h-8 mt-1 rounded border bg-background px-2"
-                >
-                  <option value="text">Text</option>
-                  <option value="javascript">JavaScript</option>
-                  <option value="python">Python</option>
-                  <option value="java">Java</option>
-                  <option value="cpp">C++</option>
-                  <option value="csharp">C#</option>
-                  <option value="go">Go</option>
-                  <option value="rust">Rust</option>
-                  <option value="html">HTML</option>
-                  <option value="css">CSS</option>
-                  <option value="sql">SQL</option>
-                  <option value="bash">Bash</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-medium">Tags (comma separated)</label>
-                <Input
-                  type="text"
-                  value={convertData.tags}
-                  onChange={(e) =>
-                    setConvertData({ ...convertData, tags: e.target.value })
-                  }
-                  className="text-xs h-8 mt-1"
-                  placeholder="tag1, tag2, tag3"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2 mt-4">
+          <div className="bg-background border rounded-lg p-4 max-w-sm w-full">
+            <h3 className="text-sm font-semibold mb-2">Convert to Snippet</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Are you sure you want to convert this clipboard entry to a snippet?
+            </p>
+            <div className="flex gap-2">
               <Button
                 variant="outline"
                 className="flex-1 text-[10px] h-8"
-                onClick={() => setShowConvertModal(false)}
+                onClick={() => {
+                  setShowConvertModal(false)
+                  setSelectedEntry(null)
+                }}
               >
                 Cancel
               </Button>
@@ -530,7 +501,7 @@ export function ClipboardPanel({ onConvertToSnippet, onClipboardChanged, hasUnsy
                 className="flex-1 text-[10px] h-8"
                 onClick={handleConvertSubmit}
               >
-                Convert
+                Confirm
               </Button>
             </div>
           </div>
@@ -538,4 +509,6 @@ export function ClipboardPanel({ onConvertToSnippet, onClipboardChanged, hasUnsy
       )}
     </div>
   )
-}
+})
+
+ClipboardPanel.displayName = 'ClipboardPanel'

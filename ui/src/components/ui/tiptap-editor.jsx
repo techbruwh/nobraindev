@@ -129,16 +129,16 @@ const FontSize = Extension.create({
 import { RichTextProvider } from 'reactjs-tiptap-editor'
 import 'reactjs-tiptap-editor/style.css'
 import { CodeBlockComponent } from './code-block-component'
-import { 
+import {
   Type,
-  Bold, 
-  Italic, 
-  Strikethrough, 
-  Code2, 
-  Heading1, 
+  Bold,
+  Italic,
+  Strikethrough,
+  Code2,
+  Heading1,
   Heading2,
   Heading3,
-  List, 
+  List,
   ListOrdered,
   MessageSquareQuote,
   Undo2,
@@ -158,7 +158,11 @@ import {
   FileCode2,
   ExternalLink,
   Edit3,
-  Trash2
+  Trash2,
+  Plus,
+  MinusIcon,
+  Columns,
+  Rows
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -213,7 +217,10 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
   const [currentFontSize, setCurrentFontSize] = useState('16px')
   const [showBubbleMenu, setShowBubbleMenu] = useState(false)
   const [bubbleMenuPosition, setBubbleMenuPosition] = useState({ top: 0, left: 0 })
+  const [showTableMenu, setShowTableMenu] = useState(false)
+  const [tableMenuPosition, setTableMenuPosition] = useState({ top: 0, left: 0 })
   const bubbleMenuRef = useRef(null)
+  const tableMenuRef = useRef(null)
   const isInteractingWithMenuRef = useRef(false)
   const linkInputRef = useRef(null)
   const linkPopupRef = useRef(null)
@@ -565,6 +572,80 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
         }
       } catch (error) {
         // Ignore cleanup errors
+      }
+    }
+  }, [editor, editable])
+
+  // Handle table menu positioning
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return
+
+    const updateTableMenu = () => {
+      if (!isMountedRef.current || editor.isDestroyed) return
+      try {
+        const isInTable = editor.isActive('table')
+
+        if (!isInTable || !editable) {
+          setShowTableMenu(false)
+          return
+        }
+
+        // Get the cursor coordinates
+        const { from } = editor.state.selection
+        const coords = editor.view.coordsAtPos(from)
+
+        // Position table menu above the cursor
+        const menuWidth = 300 // approximate width
+        const menuHeight = 40 // approximate height
+
+        let top = coords.top - menuHeight - 8
+        let left = coords.left + window.scrollX - (menuWidth / 2)
+
+        // Keep menu on screen
+        if (left < 10) left = 10
+        if (left + menuWidth > window.innerWidth - 10) {
+          left = window.innerWidth - menuWidth - 10
+        }
+
+        if (top < 10) {
+          // If no room above, show below
+          top = coords.bottom + 8
+        }
+
+        setTableMenuPosition({ top, left })
+        setShowTableMenu(true)
+      } catch (error) {
+        // Ignore errors during cleanup
+      }
+    }
+
+    const handleTableBlur = () => {
+      if (!isMountedRef.current) return
+      setTimeout(() => {
+        if (!editor.isDestroyed) {
+          const isInTable = editor.isActive('table')
+          if (!isInTable &&
+              !tableMenuRef.current?.contains(document.activeElement) &&
+              !isInteractingWithMenuRef.current) {
+            setShowTableMenu(false)
+          }
+        }
+      }, 150)
+    }
+
+    editor.on('selectionUpdate', updateTableMenu)
+    editor.on('transaction', updateTableMenu)
+    editor.on('blur', handleTableBlur)
+
+    return () => {
+      try {
+        if (!editor.isDestroyed) {
+          editor.off('selectionUpdate', updateTableMenu)
+          editor.off('transaction', updateTableMenu)
+          editor.off('blur', handleTableBlur)
+        }
+      } catch (error) {
+        // Ignore errors during cleanup
       }
     }
   }, [editor, editable])
@@ -1317,6 +1398,100 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
         </div>
       )}
       </>
+      )}
+
+      {/* Table Editing Menu - shows when cursor is inside a table */}
+      {editable && showTableMenu && (
+        <div
+          ref={tableMenuRef}
+          className="fixed bg-background border rounded-lg shadow-lg p-1 flex gap-1 items-center z-50 transition-opacity"
+          style={{
+            top: `${tableMenuPosition.top}px`,
+            left: `${tableMenuPosition.left}px`,
+          }}
+          onMouseEnter={() => {
+            isInteractingWithMenuRef.current = true
+          }}
+          onMouseLeave={() => {
+            isInteractingWithMenuRef.current = false
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault()
+            isInteractingWithMenuRef.current = true
+          }}
+        >
+          <div className="flex items-center gap-1">
+            {/* Column operations */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => editor.chain().focus().addColumnBefore().run()}
+              title="Add column before"
+            >
+              <Columns className="h-3.5 w-3.5" />
+              <Plus className="h-2 w-2 absolute -top-0.5 -right-0.5" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => editor.chain().focus().addColumnAfter().run()}
+              title="Add column after"
+            >
+              <Columns className="h-3.5 w-3.5" />
+              <Plus className="h-2 w-2 absolute -bottom-0.5 -right-0.5" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => editor.chain().focus().deleteColumn().run()}
+              title="Delete column"
+            >
+              <Columns className="h-3.5 w-3.5" />
+              <MinusIcon className="h-2 w-2 absolute -bottom-0.5 -right-0.5 text-destructive" />
+            </Button>
+
+            <div className="w-px h-5 bg-border mx-1" />
+
+            {/* Row operations */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => editor.chain().focus().addRowBefore().run()}
+              title="Add row before"
+            >
+              <Rows className="h-3.5 w-3.5" />
+              <Plus className="h-2 w-2 absolute -top-0.5 -right-0.5" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => editor.chain().focus().addRowAfter().run()}
+              title="Add row after"
+            >
+              <Rows className="h-3.5 w-3.5" />
+              <Plus className="h-2 w-2 absolute -bottom-0.5 -right-0.5" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => editor.chain().focus().deleteRow().run()}
+              title="Delete row"
+            >
+              <Rows className="h-3.5 w-3.5" />
+              <MinusIcon className="h-2 w-2 absolute -bottom-0.5 -right-0.5 text-destructive" />
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* Editor Content with RichTextProvider for bubble menus */}

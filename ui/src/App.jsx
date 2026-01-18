@@ -1,13 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { Plus, Search, FileCode, X, Edit, Trash2, Copy, Save, Brain, Download, Sparkles, CheckCircle, AlertCircle, Info, PanelLeftClose, PanelLeft, Keyboard, Code, Braces, RefreshCw, Cloud, User } from 'lucide-react'
 import { useSupabaseAuth } from '@/lib/supabase-auth'
 import { syncService } from '@/lib/sync'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
 import { SearchBar } from '@/components/ui/searchbar'
 import { SearchModal } from '@/components/ui/searchmodal'
 import { ClipboardPopup } from '@/components/ui/clipboardpopup'
@@ -68,6 +65,9 @@ function App() {
     tags: '',
     description: ''
   })
+
+  // Ref to access ClipboardPanel refresh function
+  const clipboardPanelRef = useRef(null)
 
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState({
@@ -267,6 +267,26 @@ function App() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Don't handle shortcuts when modals/popups are open (except Escape)
+      if (isSearchModalOpen || isClipboardPopupOpen || confirmDialog.isOpen) {
+        // Only allow Escape key when modals are open
+        if (e.key === 'Escape') {
+          if (showShortcutsHelp) {
+            setShowShortcutsHelp(false)
+          } else if (isSearchModalOpen) {
+            setIsSearchModalOpen(false)
+          } else if (isClipboardPopupOpen) {
+            setIsClipboardPopupOpen(false)
+          } else if (confirmDialog.isOpen) {
+            setConfirmDialog(prev => ({ ...prev, isOpen: false }))
+            if (confirmDialog.onCancel) {
+              confirmDialog.onCancel()
+            }
+          }
+        }
+        return
+      }
+
       // Cmd/Ctrl + K for search
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
@@ -279,15 +299,9 @@ function App() {
         handleNewSnippet()
         return
       }
-      // Escape to close modals
-      if (e.key === 'Escape') {
-        if (showShortcutsHelp) {
-          setShowShortcutsHelp(false)
-        } else if (isSearchModalOpen) {
-          setIsSearchModalOpen(false)
-        } else if (isClipboardPopupOpen) {
-          setIsClipboardPopupOpen(false)
-        }
+      // Escape to close shortcuts help
+      if (e.key === 'Escape' && showShortcutsHelp) {
+        setShowShortcutsHelp(false)
         return
       }
       // Cmd/Ctrl + Shift + B to toggle sidebar
@@ -302,12 +316,20 @@ function App() {
         setShowShortcutsHelp(prev => !prev)
         return
       }
+      // Cmd/Ctrl + Shift + C to refresh clipboard history (only when not in popup)
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'C' || e.key === 'c')) {
+        e.preventDefault()
+        if (activeMenu === 'clipboard' && clipboardPanelRef.current) {
+          clipboardPanelRef.current.refreshClipboard()
+        }
+        return
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown, true)
     return () => window.removeEventListener('keydown', handleKeyDown, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sidebarCollapsed, showShortcutsHelp, isSearchModalOpen, isClipboardPopupOpen])
+  }, [sidebarCollapsed, showShortcutsHelp, isSearchModalOpen, isClipboardPopupOpen, activeMenu, confirmDialog])
 
 
   const loadSnippets = async () => {
@@ -639,6 +661,11 @@ function App() {
           setIsClipboardPopupOpen(false)
         }}
         showToast={showToast}
+        onConvertToSnippet={() => {
+          setActiveMenu('snippets')
+          loadSnippets()
+          setHasUnsyncedChanges(true)
+        }}
       />
 
       {/* Toast Notification */}
@@ -718,6 +745,7 @@ function App() {
           
           {activeMenu === 'clipboard' && (
             <ClipboardPanel
+              ref={clipboardPanelRef}
               onConvertToSnippet={() => {
                 setActiveMenu('snippets')
                 loadSnippets()
@@ -908,7 +936,7 @@ function App() {
                 <h3 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">General</h3>
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
-                    <span className="text-xs">Open clipboard</span>
+                    <span className="text-xs">Refresh clipboard history</span>
                     <kbd className="px-2 py-1 text-[10px] font-medium bg-muted border border-border rounded">{isMac ? '⌘' : 'Ctrl'} Shift C</kbd>
                   </div>
                   <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">

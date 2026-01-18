@@ -79,6 +79,10 @@ export class ClipboardService {
    */
   async convertToSnippet(entryId, snippetData) {
     try {
+      console.log('🔄 [ClipboardService] Converting clipboard entry to snippet')
+      console.log('Entry ID:', entryId)
+      console.log('Snippet data:', snippetData)
+
       const snippet = {
         title: snippetData.title || 'Untitled',
         language: snippetData.language || 'text',
@@ -89,9 +93,11 @@ export class ClipboardService {
         updatedAt: new Date().toISOString(),
       }
 
+      console.log('Prepared snippet object:', snippet)
+
       // Create snippet via Tauri backend - pass as single snippet object
       const now = new Date().toISOString()
-      const result = await invoke('create_snippet', {
+      const payload = {
         snippet: {
           id: null,
           title: snippet.title,
@@ -102,14 +108,21 @@ export class ClipboardService {
           created_at: now,
           updated_at: now,
         }
-      })
+      }
+
+      console.log('🚀 Invoking create_snippet Tauri command with payload:', payload)
+
+      const result = await invoke('create_snippet', payload)
+
+      console.log('✅ [ClipboardService] Snippet created successfully:', result)
 
       // Mark as converted in clipboard (optional - keep the history)
       // await this.deleteClipboardEntry(entryId)
 
       return result
     } catch (error) {
-      console.error('Failed to convert to snippet:', error)
+      console.error('❌ [ClipboardService] Failed to convert to snippet:', error)
+      console.error('Error details:', error.message, error.stack)
       throw error
     }
   }

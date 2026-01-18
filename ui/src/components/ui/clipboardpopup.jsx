@@ -1,18 +1,28 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search, FilePlus, Clock } from 'lucide-react'
+import { Search, FilePlus, Clock, FileCode } from 'lucide-react'
 import { ClipboardService } from '@/lib/clipboard'
+import { Button } from '@/components/ui/button'
 
 /**
  * ClipboardPopup - A Clipy-like clipboard manager popup
  * Appears on Cmd/Ctrl + Shift + C for quick clipboard history access
  */
-export function ClipboardPopup({ isOpen, onClose, showToast }) {
+export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet }) {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [entries, setEntries] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const popupRef = useRef(null)
   const inputRef = useRef(null)
+
+  // Convert to snippet confirmation state
+  const [showConvertModal, setShowConvertModal] = useState(false)
+  const [selectedEntry, setSelectedEntry] = useState(null)
+
+  // Debug: Log when modal state changes
+  useEffect(() => {
+    console.log('🔍 Modal state changed:', { showConvertModal, selectedEntry })
+  }, [showConvertModal, selectedEntry])
 
   const clipboardService = new ClipboardService()
 
@@ -25,6 +35,8 @@ export function ClipboardPopup({ isOpen, onClose, showToast }) {
       // Reset state when closed
       setSearchQuery('')
       setSelectedIndex(0)
+      setShowConvertModal(false)
+      setSelectedEntry(null)
     }
   }, [isOpen])
 
@@ -47,6 +59,21 @@ export function ClipboardPopup({ isOpen, onClose, showToast }) {
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (!isOpen) return
+
+      // Escape - close modal first, then popup
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        if (showConvertModal) {
+          setShowConvertModal(false)
+          setSelectedEntry(null)
+        } else {
+          onClose()
+        }
+        return
+      }
+
+      // Don't handle other shortcuts when modal is open
+      if (showConvertModal) return
 
       // Arrow down
       if (e.key === 'ArrowDown') {
@@ -71,26 +98,11 @@ export function ClipboardPopup({ isOpen, onClose, showToast }) {
         onClose()
         return
       }
-
-      // Escape - close popup
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        onClose()
-        return
-      }
-
-      // Cmd/Ctrl + S - convert to snippet
-      if ((e.metaKey || e.ctrlKey) && e.key === 's' && filteredEntries.length > 0) {
-        e.preventDefault()
-        convertToSnippet(filteredEntries[selectedIndex])
-        onClose()
-        return
-      }
     }
 
     window.addEventListener('keydown', handleKeyDown, true)
     return () => window.removeEventListener('keydown', handleKeyDown, true)
-  }, [isOpen, selectedIndex, filteredEntries])
+  }, [isOpen, showConvertModal, selectedIndex, filteredEntries])
 
   // Scroll selected item into view
   useEffect(() => {
@@ -105,6 +117,19 @@ export function ClipboardPopup({ isOpen, onClose, showToast }) {
   // Click outside to close
   useEffect(() => {
     const handleClickOutside = (e) => {
+      // If modal is open, check if click is outside modal
+      if (showConvertModal) {
+        // Don't close if clicking on the modal content
+        const modalContent = e.target.closest('.bg-background.border.rounded-lg')
+        if (!modalContent) {
+          // Clicked outside modal - close modal only
+          setShowConvertModal(false)
+          setSelectedEntry(null)
+        }
+        return
+      }
+
+      // If modal is not open, check if clicking outside popup
       if (popupRef.current && !popupRef.current.contains(e.target)) {
         onClose()
       }
@@ -115,11 +140,20 @@ export function ClipboardPopup({ isOpen, onClose, showToast }) {
     }
 
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [isOpen, onClose])
+  }, [isOpen, onClose, showConvertModal])
 
   async function loadClipboardHistory() {
     setIsLoading(true)
     try {
+      // First, scan the system clipboard to pick up any new content
+      try {
+        await clipboardService.scanSystemClipboard()
+      } catch (scanError) {
+        // Don't fail if scanning doesn't work, just log it
+        console.warn('Clipboard scan failed, continuing with history:', scanError)
+      }
+
+      // Then load the history (which will include newly scanned content)
       const history = await clipboardService.getClipboardHistory(20)
       setEntries(history)
     } catch (error) {
@@ -140,10 +174,25 @@ export function ClipboardPopup({ isOpen, onClose, showToast }) {
     }
   }
 
-  async function convertToSnippet(entry) {
+  function handleConvertClick(entry) {
+    console.log('🔄 Convert button clicked for entry:', entry)
+    console.log('Current state - showConvertModal:', showConvertModal, 'selectedEntry:', selectedEntry)
+    setSelectedEntry(entry)
+    setShowConvertModal(true)
+    console.log('State updated - showConvertModal should now be true')
+  }
+
+  async function handleConvertSubmit() {
+    if (!selectedEntry) {
+      console.error('No selected entry to convert')
+      return
+    }
+
     try {
+      console.log('🔄 Starting conversion of clipboard entry:', selectedEntry)
+
       // Generate smart defaults for snippet data
-      const title = entry.content
+      const title = selectedEntry.content
         .split('\n')[0]
         .substring(0, 50)
         .trim() || 'Clipboard Snippet'
@@ -162,18 +211,36 @@ export function ClipboardPopup({ isOpen, onClose, showToast }) {
         'general': 'text',
       }
 
-      await clipboardService.convertToSnippet(entry.id, {
+      const snippetData = {
         title,
-        language: languageMap[entry.category.toLowerCase()] || 'text',
-        content: entry.content,
+        language: languageMap[selectedEntry.category.toLowerCase()] || 'text',
+        content: selectedEntry.content,
         tags: [],
-        description: `Converted from clipboard (${entry.category})`,
-      })
+        description: `Converted from clipboard (${selectedEntry.category})`,
+      }
+
+      console.log('📝 Snippet data prepared:', snippetData)
+
+      const result = await clipboardService.convertToSnippet(selectedEntry.id, snippetData)
+
+      console.log('✅ Conversion successful, result:', result)
+
+      // Notify parent component
+      console.log('📢 Calling onConvertToSnippet callback')
+      onConvertToSnippet?.()
+      console.log('✅ onConvertToSnippet callback completed')
 
       if (showToast) showToast('Converted to snippet', 'success')
+
+      // Close both modal and popup
+      setShowConvertModal(false)
+      setSelectedEntry(null)
+      onClose()
     } catch (error) {
-      console.error('Failed to convert to snippet:', error)
-      if (showToast) showToast('Failed to convert to snippet', 'error')
+      console.error('❌ Failed to convert to snippet:', error)
+      console.error('Error details:', error.message, error.stack)
+      if (showToast) showToast('Failed to convert to snippet: ' + error.message, 'error')
+      // Don't close modal on error, let user try again
     }
   }
 
@@ -196,11 +263,12 @@ export function ClipboardPopup({ isOpen, onClose, showToast }) {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-[15vh]">
-      <div
-        ref={popupRef}
-        className="bg-background border rounded-lg shadow-2xl w-[600px] max-h-[60vh] overflow-hidden"
-      >
+    <>
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-[15vh]">
+        <div
+          ref={popupRef}
+          className="bg-background border rounded-lg shadow-2xl w-[600px] max-h-[60vh] overflow-hidden"
+        >
         {/* Search Input */}
         <div className="relative border-b">
           <Search className="absolute left-3 h-4 w-4 text-muted-foreground top-1/2 -translate-y-1/2" />
@@ -255,13 +323,16 @@ export function ClipboardPopup({ isOpen, onClose, showToast }) {
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
-                      convertToSnippet(entry)
-                      onClose()
+                      console.log('📝 Convert button onClick fired, stopping propagation')
+                      handleConvertClick(entry)
+                    }}
+                    onMouseDown={(e) => {
+                      e.stopPropagation()
                     }}
                     className="text-muted-foreground hover:text-primary hover:bg-muted-foreground/10 p-1.5 rounded transition-colors"
-                    title="Convert to snippet (Cmd/Ctrl + S)"
+                    title="Convert to snippet"
                   >
-                    <FilePlus className="w-4 h-4" />
+                    <FileCode className="w-4 h-4" />
                   </button>
                 </div>
               </div>
@@ -273,13 +344,54 @@ export function ClipboardPopup({ isOpen, onClose, showToast }) {
         <div className="p-2 border-t text-xs text-muted-foreground bg-muted/30">
           <div className="flex items-center justify-between">
             <span>↑↓ Navigate • Enter to Copy • Esc to Close</span>
-            <span className="flex items-center gap-1">
-              <FilePlus className="w-3 h-3" />
-              Cmd/Ctrl + S to Snippet
-            </span>
+            <span>Click the icon to convert to snippet</span>
           </div>
         </div>
+        </div>
       </div>
-    </div>
+
+      {/* Convert to Snippet Confirmation Modal */}
+      {showConvertModal && selectedEntry && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4"
+          onMouseDown={(e) => {
+            e.stopPropagation()
+          }}
+        >
+          <div
+            className="bg-background border rounded-lg p-4 max-w-sm w-full shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-semibold mb-2">Convert to Snippet</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Are you sure you want to convert this clipboard entry to a snippet?
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1 text-[10px] h-8"
+                onClick={() => {
+                  console.log('❌ Cancel clicked')
+                  setShowConvertModal(false)
+                  setSelectedEntry(null)
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 text-[10px] h-8"
+                onClick={() => {
+                  console.log('✅ Confirm button clicked')
+                  handleConvertSubmit()
+                }}
+              >
+                Confirm
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
