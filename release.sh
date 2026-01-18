@@ -198,7 +198,7 @@ echo -e "${GREEN}✅ Tag created: v$NEW_VERSION${NC}"
 # Push to main
 echo ""
 echo -e "${BLUE}⬆️  Pushing to origin main...${NC}"
-git push origin main
+git push origin HEAD
 echo -e "${GREEN}✅ Pushed to main${NC}"
 
 # Push tag
