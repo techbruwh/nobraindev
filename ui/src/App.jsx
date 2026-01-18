@@ -42,6 +42,7 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   
   // Form state
+  const [isEditing, setIsEditing] = useState(false)
   const [title, setTitle] = useState('')
   const [language, setLanguage] = useState('javascript')
   const [tags, setTags] = useState('')
@@ -368,13 +369,15 @@ function App() {
   }
 
   const handleNewSnippet = () => {
+    console.log('🆕 Creating new snippet')
     setCurrentSnippet(null)
     setIsEditing(true)
-    setTitle('')
+    setTitle('')  // Clear title
     setLanguage('javascript')
     setTags('')
     setDescription('')
-    setContent('')
+    setContent('')  // Clear content to show editor
+    console.log('✅ New snippet state set')
   }
 
   const handleEditSnippet = (snippet) => {
@@ -777,7 +780,7 @@ function App() {
           </div>
 
           {/* Content Area */}
-          {!currentSnippet && !title && !content ? (
+          {!currentSnippet && !isEditing && !title && !content ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
                 <FileCode className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
