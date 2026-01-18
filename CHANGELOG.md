@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.6] - 2026-01-19
+
+### ✨ Features
+-  implement clipboard entry conversion to snippets with confirmation modal and enhance clipboard management features
+-  add global clipboard shortcut functionality and integrate clipboard popup in the UI
+-  enhance Tiptap editor with improved bubble menu interaction and heading formatting logic
+-  disable tooltips and enhance selection handling for code blocks in Tiptap editor
+
+### ♻️ Refactoring
+-  implement auto-save functionality with debounce and unsaved changes warning in snippet editor
+
+### 🔧 Chores
+-  bump version to 1.3.6
+-  enhance release script and UI component interactions for better user experience
+
+
+
 ## [1.3.6] - 2026-01-14
 
 ### 🔧 Chores
