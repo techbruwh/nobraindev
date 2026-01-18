@@ -293,6 +293,57 @@ pub fn show_clipboard_popup(app_handle: tauri::AppHandle) -> Result<(), String> 
 
     // Try to get the clipboard popup window
     if let Some(clipboard_popup) = app_handle.get_webview_window("clipboard-popup") {
+        // Get current mouse cursor position
+        if let Ok(pos) = clipboard_popup.cursor_position() {
+            let cursor_x = pos.x as i32;
+            let cursor_y = pos.y as i32;
+
+            println!("🖱️ Cursor position: x={}, y={}", cursor_x, cursor_y);
+
+            // Popup dimensions
+            let popup_width = 570;
+            let popup_height = 400;
+            let offset = 15;
+
+            // Get screen/monitor info
+            let monitor = match clipboard_popup.current_monitor() {
+                Ok(Some(m)) => m,
+                Ok(None) => return Err("Failed to get monitor".to_string()),
+                Err(e) => return Err(format!("Failed to get monitor: {}", e)),
+            };
+            let screen_size = monitor.size();
+            let screen_pos = monitor.position();
+
+            // Calculate popup position (below and right of cursor by default)
+            let mut x = cursor_x + offset;
+            let mut y = cursor_y + offset;
+
+            // Adjust if popup would go off right edge
+            if x + popup_width > screen_pos.x as i32 + screen_size.width as i32 {
+                x = cursor_x - popup_width - offset;
+            }
+
+            // Adjust if popup would go off left edge
+            if x < screen_pos.x as i32 {
+                x = screen_pos.x as i32;
+            }
+
+            // Adjust if popup would go off bottom edge
+            if y + popup_height > screen_pos.y as i32 + screen_size.height as i32 {
+                y = cursor_y - popup_height - offset;
+            }
+
+            // Adjust if popup would go off top edge
+            if y < screen_pos.y as i32 {
+                y = screen_pos.y as i32;
+            }
+
+            println!("📍 Positioning popup at: x={}, y={}", x, y);
+
+            clipboard_popup.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x, y }))
+                .map_err(|e| format!("Failed to set popup position: {}", e))?;
+        }
+
         // Show and focus the popup window
         clipboard_popup.show().map_err(|e| format!("Failed to show popup: {}", e))?;
         clipboard_popup.set_focus().map_err(|e| format!("Failed to focus popup: {}", e))?;

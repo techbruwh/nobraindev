@@ -51,7 +51,6 @@
         "height": 400,
         "decorations": false,
         "alwaysOnTop": true,
-        "center": true,
         "skipTaskbar": true,
         "resizable": false,
         "visible": false,
