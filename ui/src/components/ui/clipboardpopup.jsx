@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search, FilePlus, Clock, FileCode } from 'lucide-react'
+import { Search, FilePlus, Clock, FileCode, Check, ChevronDown } from 'lucide-react'
 import { ClipboardService } from '@/lib/clipboard'
 import { Button } from '@/components/ui/button'
+import { listen } from '@tauri-apps/api/event'
+
+const PAGE_SIZE = 20
 
 /**
  * ClipboardPopup - A Clipy-like clipboard manager popup
@@ -11,7 +14,11 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [entries, setEntries] = useState([])
+  const [allEntries, setAllEntries] = useState([])
   const [isLoading, setIsLoading] = useState(false)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const [copiedEntryId, setCopiedEntryId] = useState(null)
   const popupRef = useRef(null)
   const inputRef = useRef(null)
 
@@ -26,34 +33,101 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
 
   const clipboardService = new ClipboardService()
 
-  // Load clipboard history on mount
+  // Load more entries when scrolling near bottom
+  function loadMore() {
+    if (hasMore && !isLoading) {
+      setPage(prev => prev + 1)
+    }
+  }
+
+  // Load clipboard history on mount and when popup is triggered
   useEffect(() => {
     if (isOpen) {
+      console.log('📖 Popup opened - loading clipboard history')
       loadClipboardHistory()
       inputRef.current?.focus()
     } else {
       // Reset state when closed
       setSearchQuery('')
       setSelectedIndex(0)
+      setPage(1)
+      setEntries([]) // Clear entries when closed
+      setAllEntries([]) // Clear all entries when closed
+      setCopiedEntryId(null)
       setShowConvertModal(false)
       setSelectedEntry(null)
     }
   }, [isOpen])
 
-  // Reset selected index when filtered results change
+  // Also refresh when window regains focus (Cmd+Tab or Cmd+Shift+C again)
   useEffect(() => {
-    setSelectedIndex(0)
-  }, [searchQuery])
+    const handleFocus = () => {
+      if (isOpen) {
+        console.log('🎯 Window focused - refreshing clipboard')
+        loadClipboardHistory()
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [isOpen])
+
+  // Listen for clipboard popup triggered event (Cmd+Shift+C pressed)
+  useEffect(() => {
+    let unlistenFn
+
+    const setupListener = async () => {
+      console.log('🎯 Setting up clipboard-popup-triggered event listener')
+
+      unlistenFn = await listen('clipboard-popup-triggered', (event) => {
+        console.log('🎉 Event received!', event)
+        console.log('🔄 Cmd+Shift+C pressed - refreshing clipboard')
+
+        // Refresh the clipboard
+        loadClipboardHistory()
+
+        // Keep focus on search input after refresh
+        setTimeout(() => {
+          inputRef.current?.focus()
+        }, 100)
+      })
+
+      console.log('✅ Event listener setup complete')
+    }
+
+    setupListener()
+
+    return () => {
+      console.log('🧹 Cleaning up event listener')
+      if (unlistenFn) {
+        unlistenFn()
+      }
+    }
+  }, [])
+
+  // Update displayed entries when page, search query, or all entries change
+  useEffect(() => {
+    const filtered = allEntries.filter(entry => {
+      if (!searchQuery) return true
+      const query = searchQuery.toLowerCase()
+      return (
+        entry.content.toLowerCase().includes(query) ||
+        entry.category.toLowerCase().includes(query)
+      )
+    })
+
+    const start = 0
+    const end = page * PAGE_SIZE
+    const paginatedEntries = filtered.slice(start, end)
+
+    console.log(`📊 Pagination: page=${page}, total=${filtered.length}, showing=${paginatedEntries.length}, hasMore=${filtered.length > end}`)
+
+    setEntries(paginatedEntries)
+    setHasMore(filtered.length > end)
+  }, [page, allEntries, searchQuery])
 
   // Filter entries based on search
-  const filteredEntries = entries.filter(entry => {
-    if (!searchQuery) return true
-    const query = searchQuery.toLowerCase()
-    return (
-      entry.content.toLowerCase().includes(query) ||
-      entry.category.toLowerCase().includes(query)
-    )
-  })
+  const filteredEntries = entries
 
   // Keyboard navigation
   useEffect(() => {
@@ -63,10 +137,12 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
       // Escape - close modal first, then popup
       if (e.key === 'Escape') {
         e.preventDefault()
+        e.stopPropagation()
         if (showConvertModal) {
           setShowConvertModal(false)
           setSelectedEntry(null)
         } else {
+          // Just hide the popup, don't focus main window
           onClose()
         }
         return
@@ -91,11 +167,13 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
         return
       }
 
-      // Enter - copy selected entry
+      // Enter - copy selected entry and keep popup open
       if (e.key === 'Enter' && filteredEntries.length > 0) {
         e.preventDefault()
-        copyToClipboard(filteredEntries[selectedIndex])
-        onClose()
+        e.stopPropagation()
+        const entry = filteredEntries[selectedIndex]
+        copyToClipboard(entry)
+        // Don't close popup - user must press ESC to close
         return
       }
     }
@@ -145,19 +223,26 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
   async function loadClipboardHistory() {
     setIsLoading(true)
     try {
+      console.log('🔄 Loading clipboard history...')
+
       // First, scan the system clipboard to pick up any new content
       try {
-        await clipboardService.scanSystemClipboard()
+        const scanResult = await clipboardService.scanSystemClipboard()
+        console.log('✅ System clipboard scan result:', scanResult)
       } catch (scanError) {
         // Don't fail if scanning doesn't work, just log it
-        console.warn('Clipboard scan failed, continuing with history:', scanError)
+        console.warn('⚠️ Clipboard scan failed, continuing with history:', scanError)
       }
 
-      // Then load the history (which will include newly scanned content)
-      const history = await clipboardService.getClipboardHistory(20)
-      setEntries(history)
+      // Load all clipboard history (ordered by latest first)
+      const history = await clipboardService.getClipboardHistory(100)
+      console.log('📋 Loaded clipboard history:', history.length, 'entries')
+      console.log('📋 First entry:', history[0])
+
+      setAllEntries(history)
+      console.log('✅ All entries set to state')
     } catch (error) {
-      console.error('Failed to load clipboard history:', error)
+      console.error('❌ Failed to load clipboard history:', error)
       if (showToast) showToast('Failed to load clipboard history', 'error')
     } finally {
       setIsLoading(false)
@@ -167,7 +252,17 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
   async function copyToClipboard(entry) {
     try {
       await navigator.clipboard.writeText(entry.content)
-      if (showToast) showToast('Copied to clipboard', 'success')
+
+      // Show copy notification by setting the copied entry ID
+      setCopiedEntryId(entry.id)
+
+      // Clear the notification after 2 seconds
+      setTimeout(() => {
+        setCopiedEntryId(null)
+      }, 2000)
+
+      // Don't close popup - user must press ESC
+      console.log('✅ Copied to clipboard:', entry.content.substring(0, 50))
     } catch (error) {
       console.error('Failed to copy to clipboard:', error)
       if (showToast) showToast('Failed to copy to clipboard', 'error')
@@ -296,47 +391,71 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
               </div>
             </div>
           ) : (
-            filteredEntries.map((entry, index) => (
-              <div
-                key={entry.id}
-                id={`clipboard-entry-${index}`}
-                className={`p-3 border-b border-border/50 cursor-pointer hover:bg-accent transition-colors ${
-                  index === selectedIndex ? 'bg-accent' : ''
-                }`}
-                onClick={() => {
-                  copyToClipboard(entry)
-                  onClose()
-                }}
-              >
-                <div className="flex justify-between items-start gap-2">
-                  <div className="flex-1 overflow-hidden">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                      <Clock className="w-3 h-3" />
-                      <span>{getTimeAgo(entry.created_at)}</span>
-                      <span>•</span>
-                      <span className="capitalize">{entry.category}</span>
+            <>
+              {filteredEntries.map((entry, index) => (
+                <div
+                  key={entry.id}
+                  id={`clipboard-entry-${index}`}
+                  className={`p-3 border-b border-border/50 cursor-pointer hover:bg-accent transition-colors ${
+                    index === selectedIndex ? 'bg-accent' : ''
+                  }`}
+                  onClick={() => {
+                    copyToClipboard(entry)
+                  }}
+                >
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="flex-1 overflow-hidden">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                        <Clock className="w-3 h-3" />
+                        <span>{getTimeAgo(entry.created_at)}</span>
+                        <span>•</span>
+                        <span className="capitalize">{entry.category}</span>
+                        {copiedEntryId === entry.id && (
+                          <>
+                            <span>•</span>
+                            <span className="text-green-500 flex items-center gap-1">
+                              <Check className="w-3 h-3" />
+                              Copied!
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      <div className="text-sm font-mono text-foreground/90 truncate">
+                        {entry.content}
+                      </div>
                     </div>
-                    <div className="text-sm font-mono text-foreground/90 truncate">
-                      {entry.content}
-                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        console.log('📝 Convert button onClick fired, stopping propagation')
+                        handleConvertClick(entry)
+                      }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation()
+                      }}
+                      className="text-muted-foreground hover:text-primary hover:bg-accent p-1.5 rounded transition-colors"
+                      title="Convert to snippet"
+                    >
+                      <FileCode className="w-4 h-4" />
+                    </button>
                   </div>
+                </div>
+              ))}
+
+              {/* Load More Button */}
+              {hasMore && (
+                <div className="p-3 text-center">
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      console.log('📝 Convert button onClick fired, stopping propagation')
-                      handleConvertClick(entry)
-                    }}
-                    onMouseDown={(e) => {
-                      e.stopPropagation()
-                    }}
-                    className="text-muted-foreground hover:text-primary hover:bg-accent p-1.5 rounded transition-colors"
-                    title="Convert to snippet"
+                    onClick={loadMore}
+                    disabled={isLoading}
+                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 mx-auto transition-colors disabled:opacity-50"
                   >
-                    <FileCode className="w-4 h-4" />
+                    <ChevronDown className="w-4 h-4" />
+                    Load more ({entries.length} shown)
                   </button>
                 </div>
-              </div>
-            ))
+              )}
+            </>
           )}
         </div>
 
@@ -344,7 +463,7 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
         <div className="p-2 border-t border-border/50 text-xs text-muted-foreground">
           <div className="flex items-center justify-between">
             <span>↑↓ Navigate • Enter to Copy • Esc to Close</span>
-            <span>Click the icon to convert to snippet</span>
+            <span>{copiedEntryId ? 'Copied! Press Esc to close' : 'Click icon to convert to snippet'}</span>
           </div>
         </div>
       </div>

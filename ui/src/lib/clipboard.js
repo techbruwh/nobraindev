@@ -185,10 +185,16 @@ export class ClipboardService {
    */
   async scanSystemClipboard() {
     try {
+      console.log('🔍 Scanning system clipboard...')
+
       // Get current clipboard content using Tauri command
       const clipboardText = await invoke('read_system_clipboard')
-      
+
+      console.log('📋 Clipboard content length:', clipboardText?.length || 0)
+      console.log('📋 Clipboard content preview:', clipboardText?.substring(0, 100))
+
       if (!clipboardText || clipboardText.trim() === '') {
+        console.log('⚠️ Clipboard is empty')
         return { isNew: false, message: 'Clipboard is empty' }
       }
 
@@ -196,20 +202,29 @@ export class ClipboardService {
       const history = await this.getClipboardHistory(1)
       const lastEntry = history.length > 0 ? history[0] : null
 
+      console.log('📚 Last entry:', lastEntry ? {
+        id: lastEntry.id,
+        content_preview: lastEntry.content?.substring(0, 50),
+        created_at: lastEntry.created_at
+      } : null)
+
       // Check if this is new content (not the same as the last entry)
       if (lastEntry && lastEntry.content === clipboardText) {
+        console.log('✅ Clipboard content matches last entry - already saved')
         return { isNew: false, message: 'Already saved' }
       }
 
+      console.log('💾 Saving new clipboard content...')
       // Save the new clipboard content
       await this.saveClipboardEntry(clipboardText, {
         source: 'system',
         category: this.categorizeContent(clipboardText),
       })
 
+      console.log('✅ New clipboard content saved successfully')
       return { isNew: true, message: 'Clipboard scanned & saved', content: clipboardText }
     } catch (error) {
-      console.error('Failed to scan clipboard:', error)
+      console.error('❌ Failed to scan clipboard:', error)
       throw new Error('Failed to read system clipboard: ' + (error.message || 'Unknown error'))
     }
   }

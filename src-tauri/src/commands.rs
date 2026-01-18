@@ -287,7 +287,7 @@ pub fn update_clipboard_entry(
 
 #[tauri::command]
 pub fn show_clipboard_popup(app_handle: tauri::AppHandle) -> Result<(), String> {
-    use tauri::Manager;
+    use tauri::{Emitter, Manager};
 
     println!("📋 Showing clipboard popup window");
 
@@ -296,7 +296,11 @@ pub fn show_clipboard_popup(app_handle: tauri::AppHandle) -> Result<(), String> 
         // Show and focus the popup window
         clipboard_popup.show().map_err(|e| format!("Failed to show popup: {}", e))?;
         clipboard_popup.set_focus().map_err(|e| format!("Failed to focus popup: {}", e))?;
-        println!("✅ Clipboard popup window shown");
+
+        // Emit an event to trigger clipboard refresh in the popup
+        let _ = clipboard_popup.emit("clipboard-popup-triggered", ());
+
+        println!("✅ Clipboard popup window shown and refresh triggered");
         Ok(())
     } else {
         Err("Clipboard popup window not found".to_string())
