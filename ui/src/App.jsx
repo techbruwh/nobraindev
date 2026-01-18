@@ -372,11 +372,11 @@ function App() {
     console.log('🆕 Creating new snippet')
     setCurrentSnippet(null)
     setIsEditing(true)
-    setTitle('')  // Clear title
+    setTitle('Untitled')
     setLanguage('javascript')
     setTags('')
     setDescription('')
-    setContent('')  // Clear content to show editor
+    setContent('')
     console.log('✅ New snippet state set')
   }
 
@@ -884,7 +884,7 @@ function App() {
                 <h3 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">General</h3>
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
-                    <span className="text-xs">Refresh clipboard history</span>
+                    <span className="text-xs">Show pop up clipboard history</span>
                     <kbd className="px-2 py-1 text-[10px] font-medium bg-muted border border-border rounded">{isMac ? '⌘' : 'Ctrl'} Shift C</kbd>
                   </div>
                   <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-accent/50">
