@@ -45,6 +45,8 @@ fn main() {
             commands::delete_clipboard_entry,
             commands::clear_clipboard_history,
             commands::update_clipboard_entry,
+            commands::show_clipboard_popup,
+            commands::hide_clipboard_popup,
             commands::register_clipboard_hotkey,
             auth::store_user_token,
             auth::get_user_token,

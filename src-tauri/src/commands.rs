@@ -286,8 +286,42 @@ pub fn update_clipboard_entry(
 }
 
 #[tauri::command]
+pub fn show_clipboard_popup(app_handle: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+
+    println!("📋 Showing clipboard popup window");
+
+    // Try to get the clipboard popup window
+    if let Some(clipboard_popup) = app_handle.get_webview_window("clipboard-popup") {
+        // Show and focus the popup window
+        clipboard_popup.show().map_err(|e| format!("Failed to show popup: {}", e))?;
+        clipboard_popup.set_focus().map_err(|e| format!("Failed to focus popup: {}", e))?;
+        println!("✅ Clipboard popup window shown");
+        Ok(())
+    } else {
+        Err("Clipboard popup window not found".to_string())
+    }
+}
+
+#[tauri::command]
+pub fn hide_clipboard_popup(app_handle: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+
+    println!("📋 Hiding clipboard popup window");
+
+    // Try to get the clipboard popup window
+    if let Some(clipboard_popup) = app_handle.get_webview_window("clipboard-popup") {
+        // Hide the popup window
+        clipboard_popup.hide().map_err(|e| format!("Failed to hide popup: {}", e))?;
+        println!("✅ Clipboard popup window hidden");
+        Ok(())
+    } else {
+        Err("Clipboard popup window not found".to_string())
+    }
+}
+
+#[tauri::command]
 pub fn register_clipboard_hotkey(app_handle: tauri::AppHandle) -> Result<(), String> {
-    use tauri::Emitter;
     use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
     // List of fallback shortcuts to try, in order of preference
@@ -299,7 +333,7 @@ pub fn register_clipboard_hotkey(app_handle: tauri::AppHandle) -> Result<(), Str
         "F7",
     ];
 
-    let mut shortcuts = app_handle.global_shortcut();
+    let shortcuts = app_handle.global_shortcut();
     let mut registered_shortcut: Option<String> = None;
 
     for shortcut_str in shortcuts_to_try {
@@ -319,10 +353,11 @@ pub fn register_clipboard_hotkey(app_handle: tauri::AppHandle) -> Result<(), Str
             println!("⚡ Shortcut event received! State: {:?}", event.state);
             if event.state == ShortcutState::Pressed {
                 println!("🎯 Global shortcut '{}' pressed!", shortcut_str_clone);
-                // Emit an event to the frontend to open the clipboard popup
-                match app_handle_clone.emit("clipboard-hotkey", ()) {
-                    Ok(_) => println!("✅ Emitted clipboard-hotkey event to frontend"),
-                    Err(e) => println!("❌ Failed to emit clipboard-hotkey event: {}", e),
+
+                // Show the clipboard popup window directly
+                match show_clipboard_popup(app_handle_clone.clone()) {
+                    Ok(_) => println!("✅ Clipboard popup window opened"),
+                    Err(e) => println!("❌ Failed to show clipboard popup: {}", e),
                 }
             }
         }) {

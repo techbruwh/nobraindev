@@ -42,6 +42,20 @@
         "height": 800,
         "minWidth": 800,
         "minHeight": 600
+      },
+      {
+        "label": "clipboard-popup",
+        "url": "clipboard-popup.html",
+        "title": "Clipboard History",
+        "width": 570,
+        "height": 400,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "center": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "visible": false,
+        "transparent": true
       }
     ]
   },

@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 
 
-## [1.3.6] - 2026-01-19
+## [1.3.7] - 2026-01-19
 
 ### ✨ Features
 -  implement clipboard entry conversion to snippets with confirmation modal and enhance clipboard management features
@@ -18,7 +18,7 @@ All notable changes to this project will be documented in this file.
 -  implement auto-save functionality with debounce and unsaved changes warning in snippet editor
 
 ### 🔧 Chores
--  bump version to 1.3.6
+-  bump version to 1.3.7
 -  enhance release script and UI component interactions for better user experience
 
 

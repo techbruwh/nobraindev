@@ -53,11 +53,11 @@
   * {
     @apply border-border;
   }
-  
+
   body {
     @apply bg-background text-foreground;
   }
-  
+
   /* Custom Scrollbar Styling */
   * {
     scrollbar-width: thin;

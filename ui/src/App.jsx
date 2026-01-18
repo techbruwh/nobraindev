@@ -1,13 +1,11 @@
 import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
 import { Plus, Search, FileCode, X, Edit, Trash2, Copy, Save, Brain, Download, Sparkles, CheckCircle, AlertCircle, Info, PanelLeftClose, PanelLeft, Keyboard, Code, Braces, RefreshCw, Cloud, User } from 'lucide-react'
 import { useSupabaseAuth } from '@/lib/supabase-auth'
 import { syncService } from '@/lib/sync'
 import { Button } from '@/components/ui/button'
 import { SearchBar } from '@/components/ui/searchbar'
 import { SearchModal } from '@/components/ui/searchmodal'
-import { ClipboardPopup } from '@/components/ui/clipboardpopup'
 import { ConfirmDialog } from '@/components/ui/confirmdialog'
 import { MenuSidebar } from '@/components/ui/menusidebar'
 import { SnippetsPanel } from '@/components/ui/snippetspanel'
@@ -27,9 +25,6 @@ function App() {
   // Search Modal state - separate from sidebar filtering
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
   const [searchResults, setSearchResults] = useState([])
-
-  // Clipboard Popup state
-  const [isClipboardPopupOpen, setIsClipboardPopupOpen] = useState(false)
 
   const [isMac, setIsMac] = useState(false)
   
@@ -110,43 +105,9 @@ function App() {
   useEffect(() => {
     loadSnippets()
     checkModelStatus()
-  }, [])
 
-  // Register global clipboard hotkey and listen for events
-  useEffect(() => {
-    let unlistenFn = null
-
-    const registerGlobalShortcut = async () => {
-      try {
-        console.log('🔄 [Frontend] Attempting to register global clipboard shortcut...')
-
-        // Register the global shortcut with the system
-        await invoke('register_clipboard_hotkey')
-        console.log('✅ [Frontend] Global clipboard shortcut registered successfully!')
-
-        // Listen for the hotkey event from Tauri
-        const unlisten = await listen('clipboard-hotkey', (event) => {
-          console.log('🎯 [Frontend] Clipboard hotkey event received!', event)
-          // Open the clipboard popup when the hotkey is pressed
-          setIsClipboardPopupOpen(true)
-        })
-
-        unlistenFn = unlisten
-        console.log('✅ [Frontend] Clipboard hotkey event listener registered')
-      } catch (error) {
-        console.error('❌ [Frontend] Failed to register global clipboard shortcut:', error)
-      }
-    }
-
-    registerGlobalShortcut()
-
-    // Cleanup function
-    return () => {
-      if (unlistenFn) {
-        console.log('🧹 [Frontend] Cleaning up clipboard hotkey listener')
-        unlistenFn()
-      }
-    }
+    // Register global clipboard hotkey
+    invoke('register_clipboard_hotkey').catch(console.error)
   }, [])
 
   // Always show all snippets in sidebar (no filtering)
@@ -268,15 +229,13 @@ function App() {
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Don't handle shortcuts when modals/popups are open (except Escape)
-      if (isSearchModalOpen || isClipboardPopupOpen || confirmDialog.isOpen) {
+      if (isSearchModalOpen || confirmDialog.isOpen) {
         // Only allow Escape key when modals are open
         if (e.key === 'Escape') {
           if (showShortcutsHelp) {
             setShowShortcutsHelp(false)
           } else if (isSearchModalOpen) {
             setIsSearchModalOpen(false)
-          } else if (isClipboardPopupOpen) {
-            setIsClipboardPopupOpen(false)
           } else if (confirmDialog.isOpen) {
             setConfirmDialog(prev => ({ ...prev, isOpen: false }))
             if (confirmDialog.onCancel) {
@@ -329,7 +288,7 @@ function App() {
     window.addEventListener('keydown', handleKeyDown, true)
     return () => window.removeEventListener('keydown', handleKeyDown, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sidebarCollapsed, showShortcutsHelp, isSearchModalOpen, isClipboardPopupOpen, activeMenu, confirmDialog])
+  }, [sidebarCollapsed, showShortcutsHelp, isSearchModalOpen, activeMenu, confirmDialog])
 
 
   const loadSnippets = async () => {
@@ -652,20 +611,6 @@ function App() {
           setIsSearchModalOpen(false)
         }}
         isMac={isMac}
-      />
-
-      {/* Clipboard Popup */}
-      <ClipboardPopup
-        isOpen={isClipboardPopupOpen}
-        onClose={() => {
-          setIsClipboardPopupOpen(false)
-        }}
-        showToast={showToast}
-        onConvertToSnippet={() => {
-          setActiveMenu('snippets')
-          loadSnippets()
-          setHasUnsyncedChanges(true)
-        }}
       />
 
       {/* Toast Notification */}

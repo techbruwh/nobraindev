@@ -264,13 +264,13 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-[15vh]">
-        <div
-          ref={popupRef}
-          className="bg-background border rounded-lg shadow-2xl w-[600px] max-h-[60vh] overflow-hidden"
-        >
+      {/* Popup */}
+      <div
+        ref={popupRef}
+        className="fixed top-0 left-0 right-0 z-50 bg-background border border-border rounded-b-xl shadow-2xl w-full h-full overflow-hidden flex flex-col"
+      >
         {/* Search Input */}
-        <div className="relative border-b">
+        <div className="relative border-b border-border/50">
           <Search className="absolute left-3 h-4 w-4 text-muted-foreground top-1/2 -translate-y-1/2" />
           <input
             ref={inputRef}
@@ -283,7 +283,7 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
         </div>
 
         {/* Entries List */}
-        <div className="overflow-y-auto max-h-[45vh]">
+        <div className="overflow-y-auto flex-1">
           {isLoading ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">
               <div className="text-sm">Loading clipboard history...</div>
@@ -300,8 +300,8 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
               <div
                 key={entry.id}
                 id={`clipboard-entry-${index}`}
-                className={`p-3 border-b cursor-pointer hover:bg-muted transition-colors ${
-                  index === selectedIndex ? 'bg-muted' : ''
+                className={`p-3 border-b border-border/50 cursor-pointer hover:bg-accent transition-colors ${
+                  index === selectedIndex ? 'bg-accent' : ''
                 }`}
                 onClick={() => {
                   copyToClipboard(entry)
@@ -316,7 +316,7 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
                       <span>•</span>
                       <span className="capitalize">{entry.category}</span>
                     </div>
-                    <div className="text-sm font-mono truncate">
+                    <div className="text-sm font-mono text-foreground/90 truncate">
                       {entry.content}
                     </div>
                   </div>
@@ -329,7 +329,7 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
                     onMouseDown={(e) => {
                       e.stopPropagation()
                     }}
-                    className="text-muted-foreground hover:text-primary hover:bg-muted-foreground/10 p-1.5 rounded transition-colors"
+                    className="text-muted-foreground hover:text-primary hover:bg-accent p-1.5 rounded transition-colors"
                     title="Convert to snippet"
                   >
                     <FileCode className="w-4 h-4" />
@@ -341,25 +341,24 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
         </div>
 
         {/* Footer */}
-        <div className="p-2 border-t text-xs text-muted-foreground bg-muted/30">
+        <div className="p-2 border-t border-border/50 text-xs text-muted-foreground">
           <div className="flex items-center justify-between">
             <span>↑↓ Navigate • Enter to Copy • Esc to Close</span>
             <span>Click the icon to convert to snippet</span>
           </div>
-        </div>
         </div>
       </div>
 
       {/* Convert to Snippet Confirmation Modal */}
       {showConvertModal && selectedEntry && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4"
+          className="fixed inset-0 flex items-center justify-center z-[60] p-4 pointer-events-none"
           onMouseDown={(e) => {
             e.stopPropagation()
           }}
         >
           <div
-            className="bg-background border rounded-lg p-4 max-w-sm w-full shadow-2xl"
+            className="bg-background border border-border rounded-lg p-4 max-w-sm w-full shadow-2xl pointer-events-auto"
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
           >
