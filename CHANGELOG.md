@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.9] - 2026-01-19
+
+### ✨ Features
+-  set default title for new snippets and update clipboard history label
+-  enable global Tauri integration and add editing state for snippets
+
+
+
 ## [1.3.8] - 2026-01-19
 
 ### ✨ Features
