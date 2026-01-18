@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.8] - 2026-01-19
+
+### ✨ Features
+-  add blur event listener to close clipboard popup when window loses focus
+-  improve clipboard popup positioning based on cursor location
+-  enhance clipboard popup with event emission for refresh and improve loading logic
+-  add clipboard popup functionality with show/hide commands and integrate into main app
+
+
+
 ## [1.3.7] - 2026-01-19
 
 
