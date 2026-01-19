@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHand
 import { invoke } from '@tauri-apps/api/core'
 import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
+import { listen } from '@tauri-apps/api/event'
 import { Plus, Search, FileCode, X, Edit, Trash2, Copy, Save, Brain, Download, Sparkles, CheckCircle, AlertCircle, Info, PanelLeftClose, PanelLeft, Keyboard, Code, Braces, RefreshCw, Cloud, User } from 'lucide-react'
 import { useSupabaseAuth } from '@/lib/supabase-auth'
 import { syncService } from '@/lib/sync'
@@ -116,6 +117,32 @@ function App() {
 
     // Register global clipboard hotkey
     invoke('register_clipboard_hotkey').catch(console.error)
+  }, [])
+
+  // Listen for snippet-created event from clipboard popup
+  useEffect(() => {
+    let unlistenFn
+
+    const setupListener = async () => {
+      console.log('🎯 Setting up snippet-created event listener')
+
+      unlistenFn = await listen('snippet-created', (event) => {
+        console.log('📝 Snippet created event received!', event)
+        console.log('🔄 Reloading snippets...')
+        loadSnippets()
+      })
+
+      console.log('✅ Snippet-created event listener setup complete')
+    }
+
+    setupListener()
+
+    return () => {
+      console.log('🧹 Cleaning up snippet-created event listener')
+      if (unlistenFn) {
+        unlistenFn()
+      }
+    }
   }, [])
 
   // Always show all snippets in sidebar (no filtering)

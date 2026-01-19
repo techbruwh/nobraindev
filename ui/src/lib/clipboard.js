@@ -198,19 +198,16 @@ export class ClipboardService {
         return { isNew: false, message: 'Clipboard is empty' }
       }
 
-      // Get existing history to check for duplicates
-      const history = await this.getClipboardHistory(1)
-      const lastEntry = history.length > 0 ? history[0] : null
+      // Get existing history to check for duplicates (check last 5 entries to be safe)
+      const history = await this.getClipboardHistory(5)
 
-      console.log('📚 Last entry:', lastEntry ? {
-        id: lastEntry.id,
-        content_preview: lastEntry.content?.substring(0, 50),
-        created_at: lastEntry.created_at
-      } : null)
+      console.log('📚 Checking for duplicates in', history.length, 'recent entries')
 
-      // Check if this is new content (not the same as the last entry)
-      if (lastEntry && lastEntry.content === clipboardText) {
-        console.log('✅ Clipboard content matches last entry - already saved')
+      // Check if this content already exists in recent history
+      const isDuplicate = history.some(entry => entry.content === clipboardText)
+
+      if (isDuplicate) {
+        console.log('✅ Clipboard content already exists in history - skipping save')
         return { isNew: false, message: 'Already saved' }
       }
 

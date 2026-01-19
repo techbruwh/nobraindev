@@ -2,10 +2,11 @@
   "$schema": "https://tauri.app/schemas/2.0/capability.json",
   "identifier": "default",
   "description": "Default capabilities for the application",
-  "windows": ["main"],
+  "windows": ["main", "clipboard-popup"],
   "permissions": [
     "core:event:allow-listen",
     "core:event:allow-emit",
+    "core:event:allow-emit-to",
     "core:path:allow-resolve",
     "core:window:allow-center",
     "core:window:allow-close",
@@ -13,10 +14,12 @@
     "core:window:allow-show",
     "core:window:allow-minimize",
     "core:window:allow-maximize",
+    "core:window:allow-cursor-position",
+    "core:window:allow-current-monitor",
     "global-shortcut:allow-is-registered",
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister",
     "updater:default",
-    "process:allow-relaunch"
+    "process:allow-restart"
   ]
 }

@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { Search, FilePlus, Clock, FileCode, Check, ChevronDown } from 'lucide-react'
 import { ClipboardService } from '@/lib/clipboard'
 import { Button } from '@/components/ui/button'
-import { listen } from '@tauri-apps/api/event'
+import { listen, emit } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { invoke } from '@tauri-apps/api/core'
 
 const PAGE_SIZE = 20
 
@@ -22,6 +23,7 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
   const [copiedEntryId, setCopiedEntryId] = useState(null)
   const popupRef = useRef(null)
   const inputRef = useRef(null)
+  const isLoadingRef = useRef(false)
 
   // Convert to snippet confirmation state
   const [showConvertModal, setShowConvertModal] = useState(false)
@@ -57,6 +59,7 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
       setCopiedEntryId(null)
       setShowConvertModal(false)
       setSelectedEntry(null)
+      isLoadingRef.current = false // Reset loading flag
     }
   }, [isOpen])
 
@@ -235,7 +238,15 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
   }, [isOpen, onClose, showConvertModal])
 
   async function loadClipboardHistory() {
+    // Prevent concurrent loading
+    if (isLoadingRef.current) {
+      console.log('⏳ Already loading clipboard history, skipping...')
+      return
+    }
+
+    isLoadingRef.current = true
     setIsLoading(true)
+
     try {
       console.log('🔄 Loading clipboard history...')
 
@@ -260,6 +271,7 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
       if (showToast) showToast('Failed to load clipboard history', 'error')
     } finally {
       setIsLoading(false)
+      isLoadingRef.current = false
     }
   }
 
@@ -338,6 +350,14 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
       console.log('📢 Calling onConvertToSnippet callback')
       onConvertToSnippet?.()
       console.log('✅ onConvertToSnippet callback completed')
+
+      // Emit event to main window to reload snippets
+      try {
+        await emit('snippet-created', {}, { target: 'main' })
+        console.log('✅ Emitted snippet-created event to main window')
+      } catch (error) {
+        console.warn('⚠️ Failed to emit snippet-created event:', error)
+      }
 
       if (showToast) showToast('Converted to snippet', 'success')
 
