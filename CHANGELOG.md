@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.4] - 2026-01-19
+
+### 🐛 Bug Fixes
+-  rename Tauri private key environment variable for clarity
+
+
+
 ## [1.5.3] - 2026-01-19
 
 ### 🐛 Bug Fixes
