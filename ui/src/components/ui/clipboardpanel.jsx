@@ -1,5 +1,6 @@
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react'
-import { Clipboard, Trash2, Copy, FileCode, Search, RefreshCw, AlertCircle, Cloud, CheckCircle, Loader2, ArrowUp, Shield } from 'lucide-react'
+import { Clipboard, Trash2, Copy, FileCode, Search, RefreshCw, AlertCircle, Cloud, CheckCircle, Loader2, ArrowUp, Shield, Keyboard } from 'lucide-react'
+import { invoke } from '@tauri-apps/api/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -267,27 +268,27 @@ export const ClipboardPanel = forwardRef(({ onConvertToSnippet, onClipboardChang
 
     try {
       const result = await clipboardService.syncAll(email)
-      
+
       // Reload clipboard after sync
       await loadClipboardHistory()
-      
+
       // Create user-friendly message
       const message = 'Secured cloud sync successful'
-      
+
       setSyncStatus({
         type: 'success',
         message
       })
       setLastSyncTime(result.syncTime)
-      
+
       // Notify parent that sync completed successfully
       onClipboardSyncComplete?.(result.syncTime)
-      
+
       // Clear success message after 3 seconds
       setTimeout(() => setSyncStatus(null), 3000)
     } catch (error) {
       console.error('Clipboard sync failed:', error)
-      
+
       let errorMessage
       if (error.message === 'SYNC_NOT_APPROVED') {
         errorMessage = 'Sync access not approved yet. Please wait for approval.'
@@ -298,16 +299,25 @@ export const ClipboardPanel = forwardRef(({ onConvertToSnippet, onClipboardChang
       } else {
         errorMessage = error.message || 'Sync failed. Please try again.'
       }
-      
+
       setSyncStatus({
         type: 'error',
         message: errorMessage
       })
-      
+
       // Clear error message after 5 seconds
       setTimeout(() => setSyncStatus(null), 5000)
     } finally {
       setIsSyncing(false)
+    }
+  }
+
+  const handleOpenClipboardPopup = async () => {
+    try {
+      await invoke('show_clipboard_popup')
+    } catch (error) {
+      console.error('Failed to open clipboard popup:', error)
+      setError('Failed to open clipboard popup')
     }
   }
 
@@ -362,11 +372,34 @@ export const ClipboardPanel = forwardRef(({ onConvertToSnippet, onClipboardChang
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        {/* Open Popup Hint */}
+        <div className="p-3 rounded-md border bg-blue-500/5 border-blue-500/20">
+          <div className="flex items-start gap-2 mb-2">
+            <Keyboard className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-medium text-blue-600 mb-1">
+                Open Clipboard Popup
+              </p>
+              <p className="text-[10px] text-muted-foreground mb-2">
+                Press <kbd className="px-1.5 py-0.5 rounded bg-background border text-[9px] font-mono">⌘⇧C</kbd> or <kbd className="px-1.5 py-0.5 rounded bg-background border text-[9px] font-mono">Ctrl+Shift+C</kbd> to open clipboard in the center panel
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full text-[9px] h-7 border-blue-500/30 text-blue-600 hover:bg-blue-500/10 hover:text-blue-700"
+                onClick={handleOpenClipboardPopup}
+              >
+                Open Clipboard Popup
+              </Button>
+            </div>
+          </div>
+        </div>
+
         {/* Sync Status */}
         {syncStatus && (
           <div className={`p-2 rounded-md border ${
-            syncStatus.type === 'success' 
-              ? 'bg-green-500/10 border-green-500/20' 
+            syncStatus.type === 'success'
+              ? 'bg-green-500/10 border-green-500/20'
               : 'bg-destructive/10 border-destructive/20'
           }`}>
             <div className="flex items-center gap-2">
