@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.1] - 2026-01-19
+
+### ✨ Features
+-  improve clipboard popup positioning by utilizing main window cursor position and monitor detection
+-  enhance clipboard functionality with event listeners and improved history management
+
+
+
 ## [1.5.0] - 2026-01-19
 
 ### ✨ Features
