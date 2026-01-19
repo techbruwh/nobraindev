@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.5] - 2026-01-19
+
+### ✨ Features
+-  add clipboard popup functionality and user guidance
+
+
+
 ## [1.5.4] - 2026-01-19
 
 ### 🐛 Bug Fixes
