@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2026-01-19
+
+### ✨ Features
+-  add updater and process plugins with permissions for exit and restart commands
+
+
+
 ## [1.4.0] - 2026-01-19
 
 ### ✨ Features
