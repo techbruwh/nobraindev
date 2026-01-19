@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-01-19
+
+### ✨ Features
+-  implement multi-page build support by dynamically loading HTML files
+
+
+
 ## [1.3.9] - 2026-01-19
 
 ### ✨ Features
