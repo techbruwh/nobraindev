@@ -87,6 +87,18 @@ jobs:
           cd ui
           npm run build
 
+      - name: Setup Tauri updater signing key
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        run: |
+          mkdir -p ~/.tauri
+          echo "$TAURI_PRIVATE_KEY" > ~/.tauri/nobraindev.key
+          if [ -n "$TAURI_KEY_PASSWORD" ]; then
+            export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$TAURI_KEY_PASSWORD"
+          fi
+          echo "✅ Tauri signing key configured"
+
       # macOS Code Signing Setup
       - name: Import Apple Code Signing Certificate
         if: matrix.platform.os == 'macos-latest'
@@ -119,6 +131,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'NoBrainDev ${{ github.ref_name }}'
@@ -233,3 +247,100 @@ jobs:
           done
           
           echo "✅ All DMGs replaced with notarized versions!"
+
+  # Create latest.json for auto-updater
+  create-updater-json:
+    needs: notarize
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: get_version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Download all release assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_TAG=${{ github.ref_name }}
+          mkdir -p release-assets
+
+          # Download all assets from the release
+          gh release download $RELEASE_TAG --dir release-assets
+
+          echo "📦 Downloaded files:"
+          ls -lh release-assets
+
+      - name: Extract signatures and create latest.json
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+
+          # Find and read signature files
+          MACOS_ARM_SIG=$(find release-assets -name "*aarch64*dmg.sig" -exec cat {} \; 2>/dev/null | base64 -w 0 || echo "")
+          MACOS_X64_SIG=$(find release-assets -name "*x64*dmg.sig" -not -name "*aarch64*" -exec cat {} \; 2>/dev/null | base64 -w 0 || echo "")
+          LINUX_SIG=$(find release-assets -name "*.AppImage.sig" -exec cat {} \; 2>/dev/null | base64 -w 0 || echo "")
+          WINDOWS_SIG=$(find release-assets -name "*setup.exe.sig" -exec cat {} \; 2>/dev/null | base64 -w 0 || echo "")
+
+          # Get actual filenames
+          MACOS_ARM_DMG=$(find release-assets -name "*aarch64*.dmg" -exec basename {} \; 2>/dev/null | head -1 || echo "")
+          MACOS_X64_DMG=$(find release-assets -name "*x64*.dmg" -not -name "*aarch64*" -exec basename {} \; 2>/dev/null | head -1 || echo "")
+          LINUX_APPIMAGE=$(find release-assets -name "*.AppImage" -not -name "*.sig" -exec basename {} \; 2>/dev/null | head -1 || echo "")
+          WINDOWS_EXE=$(find release-assets -name "*setup.exe" -not -name "*.sig" -exec basename {} \; 2>/dev/null | head -1 || echo "")
+
+          echo "Found files:"
+          echo "macOS ARM: $MACOS_ARM_DMG"
+          echo "macOS x64: $MACOS_X64_DMG"
+          echo "Linux: $LINUX_APPIMAGE"
+          echo "Windows: $WINDOWS_EXE"
+
+          # Create latest.json
+          cat > latest.json << EOF
+          {
+            "version": "$VERSION",
+            "notes": "See [GitHub Releases](https://github.com/techbruwh/nobraindev/releases/tag/v$VERSION) for details.",
+            "pub_date": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "platforms": {}
+          }
+          EOF
+
+          # Add platforms if files exist
+          if [ -n "$MACOS_ARM_SIG" ] && [ -n "$MACOS_ARM_DMG" ]; then
+            jq --arg sig "$MACOS_ARM_SIG" --arg url "https://github.com/techbruwh/nobraindev/releases/download/v$VERSION/$MACOS_ARM_DMG" \
+              '.platforms["darwin-aarch64"] = {signature: $sig, url: $url}' latest.json > latest.json.tmp
+            mv latest.json.tmp latest.json
+          fi
+
+          if [ -n "$MACOS_X64_SIG" ] && [ -n "$MACOS_X64_DMG" ]; then
+            jq --arg sig "$MACOS_X64_SIG" --arg url "https://github.com/techbruwh/nobraindev/releases/download/v$VERSION/$MACOS_X64_DMG" \
+              '.platforms["darwin-x86_64"] = {signature: $sig, url: $url}' latest.json > latest.json.tmp
+            mv latest.json.tmp latest.json
+          fi
+
+          if [ -n "$LINUX_SIG" ] && [ -n "$LINUX_APPIMAGE" ]; then
+            jq --arg sig "$LINUX_SIG" --arg url "https://github.com/techbruwh/nobraindev/releases/download/v$VERSION/$LINUX_APPIMAGE" \
+              '.platforms["linux-x86_64"] = {signature: $sig, url: $url}' latest.json > latest.json.tmp
+            mv latest.json.tmp latest.json
+          fi
+
+          if [ -n "$WINDOWS_SIG" ] && [ -n "$WINDOWS_EXE" ]; then
+            jq --arg sig "$WINDOWS_SIG" --arg url "https://github.com/techbruwh/nobraindev/releases/download/v$VERSION/$WINDOWS_EXE" \
+              '.platforms["windows-x86_64"] = {signature: $sig, url: $url}' latest.json > latest.json.tmp
+            mv latest.json.tmp latest.json
+          fi
+
+          echo "✅ Created latest.json:"
+          cat latest.json
+
+      - name: Upload latest.json to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_TAG=${{ github.ref_name }}
+          gh release upload $RELEASE_TAG latest.json --clobber
+          echo "✅ latest.json uploaded to release!"

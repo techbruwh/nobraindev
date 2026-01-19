@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { check } from '@tauri-apps/plugin-updater'
+import { relaunch } from '@tauri-apps/plugin-process'
 import { Plus, Search, FileCode, X, Edit, Trash2, Copy, Save, Brain, Download, Sparkles, CheckCircle, AlertCircle, Info, PanelLeftClose, PanelLeft, Keyboard, Code, Braces, RefreshCw, Cloud, User } from 'lucide-react'
 import { useSupabaseAuth } from '@/lib/supabase-auth'
 import { syncService } from '@/lib/sync'
@@ -91,6 +93,10 @@ function App() {
   const [isDeletingSnippet, setIsDeletingSnippet] = useState(false)
   const [deleteError, setDeleteError] = useState(null)
 
+  // Update state
+  const [availableUpdate, setAvailableUpdate] = useState(null)
+  const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false)
+
   // Detect OS
   useEffect(() => {
     setIsMac(navigator.platform.toUpperCase().indexOf('MAC') >= 0)
@@ -106,6 +112,7 @@ function App() {
   useEffect(() => {
     loadSnippets()
     checkModelStatus()
+    checkForUpdates()
 
     // Register global clipboard hotkey
     invoke('register_clipboard_hotkey').catch(console.error)
@@ -308,6 +315,59 @@ function App() {
       setModelStatus(status)
     } catch (error) {
       console.error('Failed to check model status:', error)
+    }
+  }
+
+  const checkForUpdates = async () => {
+    try {
+      console.log('🔄 Checking for updates...')
+      const update = await check()
+
+      if (update) {
+        console.log(`✅ Update available: ${update.version}`)
+        setAvailableUpdate(update)
+        showToast(`Update available: v${update.version}`, 'info')
+      } else {
+        console.log('✅ No updates available')
+      }
+    } catch (error) {
+      console.error('Failed to check for updates:', error)
+    }
+  }
+
+  const installUpdate = async () => {
+    if (!availableUpdate) return
+
+    setIsDownloadingUpdate(true)
+    try {
+      let downloaded = 0
+      let contentLength = 0
+
+      await availableUpdate.downloadAndInstall((event) => {
+        switch (event.event) {
+          case 'Started':
+            contentLength = event.data.contentLength
+            console.log(`started downloading ${event.data.contentLength} bytes`)
+            break
+          case 'Progress':
+            downloaded += event.data.chunkLength
+            console.log(`downloaded ${downloaded} from ${contentLength}`)
+            showToast(`Downloading update: ${Math.round((downloaded / contentLength) * 100)}%`, 'info')
+            break
+          case 'Finished':
+            console.log('download finished')
+            showToast('Update downloaded! Restarting...', 'success')
+            break
+        }
+      })
+
+      console.log('update installed')
+      await relaunch()
+    } catch (error) {
+      console.error('Failed to install update:', error)
+      showToast('Failed to install update', 'error')
+    } finally {
+      setIsDownloadingUpdate(false)
     }
   }
 
@@ -854,6 +914,18 @@ function App() {
         </p>
         
         <div className="flex items-center gap-2">
+          {availableUpdate && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-[9px] bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={installUpdate}
+              disabled={isDownloadingUpdate}
+            >
+              <Download className="h-3 w-3 mr-1" />
+              {isDownloadingUpdate ? 'Installing...' : `Update to v${availableUpdate.version}`}
+            </Button>
+          )}
           <span className="text-[9px] text-muted-foreground flex items-center gap-1">
             <Cloud className="h-3 w-3" />
             {lastSyncTime ? (

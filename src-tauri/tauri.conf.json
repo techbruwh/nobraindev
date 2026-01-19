@@ -16,6 +16,7 @@
       "icons/macos/AppIcon.icns",
       "icons/web/favicon.ico"
     ],
+    "createUpdaterArtifacts": true,
     "macOS": {
       "minimumSystemVersion": "10.13",
       "bundleName": "NoBrainDev"
@@ -61,6 +62,12 @@
   "plugins": {
     "shell": {
       "open": true
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJCMTRGRDQ1MjQwNTAzOEYKUldTUEF3VWtSZjBVdS96WXlrb2ZIc1VianZDWTZJUm9ncG9QYnZmS055c3l2VHZ5dHJCUWhCN2UK",
+      "endpoints": [
+        "https://github.com/techbruwh/nobraindev/releases/latest/download/latest.json"
+      ]
     }
   }
 }
