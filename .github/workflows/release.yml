@@ -98,6 +98,7 @@ jobs:
             export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$TAURI_KEY_PASSWORD"
           fi
           echo "✅ Tauri signing key configured"
+        shell: bash
 
       # macOS Code Signing Setup
       - name: Import Apple Code Signing Certificate
