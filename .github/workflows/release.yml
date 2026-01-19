@@ -90,13 +90,9 @@ jobs:
       - name: Setup Tauri updater signing key
         env:
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         run: |
           mkdir -p ~/.tauri
           echo "$TAURI_PRIVATE_KEY" > ~/.tauri/nobraindev.key
-          if [ -n "$TAURI_KEY_PASSWORD" ]; then
-            export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$TAURI_KEY_PASSWORD"
-          fi
           echo "✅ Tauri signing key configured"
         shell: bash
 
@@ -133,7 +129,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'NoBrainDev ${{ github.ref_name }}'
