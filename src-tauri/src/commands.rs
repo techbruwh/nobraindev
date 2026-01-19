@@ -291,58 +291,113 @@ pub fn show_clipboard_popup(app_handle: tauri::AppHandle) -> Result<(), String> 
 
     println!("📋 Showing clipboard popup window");
 
-    // Try to get the clipboard popup window
-    if let Some(clipboard_popup) = app_handle.get_webview_window("clipboard-popup") {
-        // Get current mouse cursor position
-        if let Ok(pos) = clipboard_popup.cursor_position() {
+    // Try to get both the main window and clipboard popup window
+    let main_window = app_handle.get_webview_window("main");
+    let clipboard_popup = app_handle.get_webview_window("clipboard-popup");
+
+    if let (Some(main_window), Some(clipboard_popup)) = (main_window, clipboard_popup) {
+        // Get current mouse cursor position from the main window
+        // This works better across multiple monitors
+        let (cursor_x, cursor_y) = if let Ok(pos) = main_window.cursor_position() {
             let cursor_x = pos.x as i32;
             let cursor_y = pos.y as i32;
+            println!("🖱️ Cursor position from main window: x={}, y={}", cursor_x, cursor_y);
+            (cursor_x, cursor_y)
+        } else {
+            // Fallback: try to get from primary monitor
+            println!("⚠️ Could not get cursor position from main window, using fallback");
+            (100, 100) // Default fallback position
+        };
 
-            println!("🖱️ Cursor position: x={}, y={}", cursor_x, cursor_y);
+        // Popup dimensions (must match tauri.conf.json)
+        let popup_width = 570;
+        let popup_height = 400;
+        let offset = 15;
 
-            // Popup dimensions
-            let popup_width = 570;
-            let popup_height = 400;
-            let offset = 15;
+        // Find which monitor the cursor is on
+        let target_monitor = if let Ok(monitors) = clipboard_popup.available_monitors() {
+            monitors
+                .into_iter()
+                .find(|monitor| {
+                    let monitor_pos = monitor.position();
+                    let monitor_size = monitor.size();
+                    cursor_x >= monitor_pos.x as i32
+                        && cursor_x < (monitor_pos.x as i32 + monitor_size.width as i32)
+                        && cursor_y >= monitor_pos.y as i32
+                        && cursor_y < (monitor_pos.y as i32 + monitor_size.height as i32)
+                })
+                .or_else(|| {
+                    // Fallback to primary monitor if cursor is not found on any monitor
+                    clipboard_popup.primary_monitor().ok().flatten()
+                })
+        } else {
+            clipboard_popup.primary_monitor().ok().flatten()
+        };
 
-            // Get screen/monitor info
-            let monitor = match clipboard_popup.current_monitor() {
-                Ok(Some(m)) => m,
-                Ok(None) => return Err("Failed to get monitor".to_string()),
-                Err(e) => return Err(format!("Failed to get monitor: {}", e)),
-            };
-            let screen_size = monitor.size();
-            let screen_pos = monitor.position();
+        let monitor = match target_monitor {
+            Some(m) => m,
+            None => return Err("Failed to find monitor for cursor position".to_string()),
+        };
 
-            // Calculate popup position (below and right of cursor by default)
-            let mut x = cursor_x + offset;
-            let mut y = cursor_y + offset;
+        let screen_pos = monitor.position();
+        let screen_size = monitor.size();
 
-            // Adjust if popup would go off right edge
-            if x + popup_width > screen_pos.x as i32 + screen_size.width as i32 {
-                x = cursor_x - popup_width - offset;
+        println!("📺 Monitor position: x={}, y={}, size={}x{}",
+            screen_pos.x, screen_pos.y, screen_size.width, screen_size.height);
+
+        // Calculate monitor boundaries
+        let monitor_left = screen_pos.x as i32;
+        let monitor_right = screen_pos.x as i32 + screen_size.width as i32;
+        let monitor_top = screen_pos.y as i32;
+        let monitor_bottom = screen_pos.y as i32 + screen_size.height as i32;
+
+        // Calculate popup position (below and right of cursor by default)
+        let mut x = cursor_x + offset;
+        let mut y = cursor_y + offset;
+
+        // Adjust horizontal position if popup would go off right edge
+        if x + popup_width > monitor_right {
+            // Try to position to the left of the cursor
+            x = cursor_x - popup_width - offset;
+            // If that would go off the left edge, clamp to left edge
+            if x < monitor_left {
+                x = monitor_left;
             }
-
-            // Adjust if popup would go off left edge
-            if x < screen_pos.x as i32 {
-                x = screen_pos.x as i32;
-            }
-
-            // Adjust if popup would go off bottom edge
-            if y + popup_height > screen_pos.y as i32 + screen_size.height as i32 {
-                y = cursor_y - popup_height - offset;
-            }
-
-            // Adjust if popup would go off top edge
-            if y < screen_pos.y as i32 {
-                y = screen_pos.y as i32;
-            }
-
-            println!("📍 Positioning popup at: x={}, y={}", x, y);
-
-            clipboard_popup.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x, y }))
-                .map_err(|e| format!("Failed to set popup position: {}", e))?;
         }
+
+        // Adjust horizontal position if popup would go off left edge
+        if x < monitor_left {
+            x = monitor_left;
+        }
+
+        // Final horizontal check to ensure it doesn't overflow right edge
+        if x + popup_width > monitor_right {
+            x = monitor_right - popup_width;
+        }
+
+        // Adjust vertical position if popup would go off bottom edge
+        if y + popup_height > monitor_bottom {
+            y = cursor_y - popup_height - offset;
+            // If that would go off the top edge, clamp to top edge
+            if y < monitor_top {
+                y = monitor_top;
+            }
+        }
+
+        // Adjust vertical position if popup would go off top edge
+        if y < monitor_top {
+            y = monitor_top;
+        }
+
+        // Final vertical check to ensure it doesn't overflow bottom edge
+        if y + popup_height > monitor_bottom {
+            y = monitor_bottom - popup_height;
+        }
+
+        println!("📍 Positioning popup at: x={}, y={}", x, y);
+
+        clipboard_popup.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x, y }))
+            .map_err(|e| format!("Failed to set popup position: {}", e))?;
 
         // Show and focus the popup window
         clipboard_popup.show().map_err(|e| format!("Failed to show popup: {}", e))?;
@@ -354,7 +409,7 @@ pub fn show_clipboard_popup(app_handle: tauri::AppHandle) -> Result<(), String> 
         println!("✅ Clipboard popup window shown and refresh triggered");
         Ok(())
     } else {
-        Err("Clipboard popup window not found".to_string())
+        Err("Could not find main window or clipboard popup window".to_string())
     }
 }
 
