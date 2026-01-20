@@ -227,6 +227,7 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
   const isInteractingWithMenuRef = useRef(false)
   const linkInputRef = useRef(null)
   const linkPopupRef = useRef(null)
+  const currentLinkPosRef = useRef(null)
 
   const editor = useEditor({
     extensions: [
@@ -395,6 +396,15 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           event.preventDefault()
           const rect = target.getBoundingClientRect()
 
+          // Store the position of the link in the editor
+          try {
+            const pos = editor.view.posAtDOM(target, 0)
+            currentLinkPosRef.current = pos
+          } catch (error) {
+            console.warn('Could not get link position:', error)
+            currentLinkPosRef.current = null
+          }
+
           setCurrentLinkUrl(url)
           setLinkPopupPosition({
             top: rect.bottom + window.scrollY + 8,
@@ -424,6 +434,15 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
 
           const url = target.getAttribute('href')
           const rect = target.getBoundingClientRect()
+
+          // Store the position of the link in the editor
+          try {
+            const pos = editor.view.posAtDOM(target, 0)
+            currentLinkPosRef.current = pos
+          } catch (error) {
+            console.warn('Could not get link position:', error)
+            currentLinkPosRef.current = null
+          }
 
           setCurrentLinkUrl(url)
           setLinkPopupPosition({
@@ -756,25 +775,53 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
   }
 
   const updateLink = () => {
-    if (currentLinkUrl && editor) {
-      let url = currentLinkUrl.trim()
-      
-      // Add https:// if no protocol
-      if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
-        url = 'https://' + url
-      }
-      
-      editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
-      setShowLinkPopup(false)
-      setIsEditingLink(false)
+    if (!editor || !currentLinkUrl) return
+
+    let url = currentLinkUrl.trim()
+
+    // Add https:// if no protocol
+    if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url
     }
+
+    // Use the stored position to update the link
+    if (currentLinkPosRef.current !== null) {
+      try {
+        editor.chain()
+          .focus()
+          .setTextSelection(currentLinkPosRef.current)
+          .extendMarkRange('link')
+          .setLink({ href: url })
+          .run()
+      } catch (error) {
+        console.warn('Error updating link:', error)
+      }
+    }
+
+    setShowLinkPopup(false)
+    setIsEditingLink(false)
+    currentLinkPosRef.current = null
   }
 
   const removeLink = () => {
-    if (editor) {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run()
-      setShowLinkPopup(false)
+    if (!editor) return
+
+    // Use the stored position to remove the link
+    if (currentLinkPosRef.current !== null) {
+      try {
+        editor.chain()
+          .focus()
+          .setTextSelection(currentLinkPosRef.current)
+          .extendMarkRange('link')
+          .unsetLink()
+          .run()
+      } catch (error) {
+        console.warn('Error removing link:', error)
+      }
     }
+
+    setShowLinkPopup(false)
+    currentLinkPosRef.current = null
   }
 
   const addImage = () => {
@@ -1181,73 +1228,124 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
       {showLinkPopup && (
         <div
           ref={linkPopupRef}
-          className="fixed bg-background border rounded-lg shadow-lg p-2 z-50 min-w-[300px]"
+          className="fixed bg-background border rounded-xl shadow-xl z-50 min-w-[320px] overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200"
           style={{
             top: `${linkPopupPosition.top}px`,
             left: `${linkPopupPosition.left}px`,
           }}
-          onMouseDown={(e) => e.preventDefault()}
         >
           {isEditingLink ? (
             // Edit mode
-            <div className="flex gap-2 items-center">
-              <Input
-                type="url"
-                placeholder="Enter URL..."
-                value={currentLinkUrl}
-                onChange={(e) => setCurrentLinkUrl(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    updateLink()
-                  } else if (e.key === 'Escape') {
-                    setIsEditingLink(false)
-                    setShowLinkPopup(false)
-                  }
-                }}
-                className="h-8 text-xs flex-1"
-                autoFocus
-              />
-              <Button size="sm" className="h-8" onClick={updateLink}>
-                Save
-              </Button>
-              <Button size="sm" variant="ghost" className="h-8" onClick={() => setIsEditingLink(false)}>
-                Cancel
-              </Button>
+            <div className="p-3 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <Edit3 className="h-4 w-4 text-primary" />
+                <span>Edit Link</span>
+              </div>
+              <div className="flex gap-2 items-center">
+                <Input
+                  type="url"
+                  placeholder="https://example.com"
+                  value={currentLinkUrl}
+                  onChange={(e) => setCurrentLinkUrl(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      updateLink()
+                    } else if (e.key === 'Escape') {
+                      setIsEditingLink(false)
+                    }
+                  }}
+                  className="h-9 text-sm flex-1"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 px-3"
+                  onClick={() => setIsEditingLink(false)}
+                >
+                  Cancel
+                </Button>
+                <Button size="sm" className="h-8 px-4" onClick={updateLink}>
+                  Save
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground text-center pt-1 border-t">
+                Press <kbd className="px-1 py-0.5 bg-muted rounded text-[9px]">Enter</kbd> to save, <kbd className="px-1 py-0.5 bg-muted rounded text-[9px]">Esc</kbd> to cancel
+              </p>
             </div>
           ) : (
             // View mode
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Link2 className="h-3 w-3 shrink-0" />
-                <span className="flex-1 truncate">{currentLinkUrl}</span>
+            <div className="p-3 space-y-3">
+              {/* Header with icon */}
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <Link2 className="h-4 w-4 text-primary" />
+                <span>Link</span>
               </div>
-              {editable && (
-                <>
-                  <div className="flex gap-1 justify-center">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 w-8 p-0"
-                      onClick={() => setIsEditingLink(true)}
-                      title="Edit link"
-                    >
-                      <Edit3 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      className="h-8 w-8 p-0"
-                      onClick={removeLink}
-                      title="Remove link"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <p className="text-[9px] text-muted-foreground text-center">
-                    <kbd className="px-1 bg-muted rounded">Cmd/Ctrl</kbd> + Click to open
-                  </p>
-                </>
+
+              {/* URL display with copy functionality */}
+              <div className="bg-muted/50 rounded-lg p-2.5 group relative">
+                <div className="flex items-start gap-2">
+                  <Link2 className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                  <span
+                    className="text-xs text-foreground break-all leading-relaxed flex-1"
+                    title={currentLinkUrl}
+                  >
+                    {currentLinkUrl}
+                  </span>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              {editable ? (
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-9 flex-1 gap-1.5 text-xs"
+                    onClick={() => setIsEditingLink(true)}
+                  >
+                    <Edit3 className="h-3.5 w-3.5" />
+                    Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-9 flex-1 gap-1.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={removeLink}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Remove
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-9 flex-1 gap-1.5 text-xs"
+                    onClick={async () => {
+                      try {
+                        await open(currentLinkUrl)
+                      } catch (error) {
+                        console.error('Failed to open link:', error)
+                      }
+                    }}
+                  >
+                    <Link2 className="h-3.5 w-3.5" />
+                    Open Link
+                  </Button>
+                </div>
               )}
+
+              {/* Hint text */}
+              <p className="text-[10px] text-muted-foreground text-center pt-2 border-t">
+                {editable
+                  ? 'Click to edit • Cmd/Ctrl + click to open'
+                  : 'Cmd/Ctrl + click to open in browser'
+                }
+              </p>
             </div>
           )}
         </div>
