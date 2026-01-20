@@ -25,6 +25,9 @@ export const ClipboardPanel = forwardRef(({ onConvertToSnippet, onClipboardChang
   const [lastSyncTime, setLastSyncTime] = useState(null)
   const [syncApproval, setSyncApproval] = useState(null)
 
+  // Pagination state
+  const [displayCount, setDisplayCount] = useState(20)
+
   // Expose refreshClipboard function to parent
   useImperativeHandle(ref, () => ({
     refreshClipboard: () => {
@@ -73,7 +76,7 @@ export const ClipboardPanel = forwardRef(({ onConvertToSnippet, onClipboardChang
     setIsLoading(true)
     setError(null)
     try {
-      const data = await clipboardService.getClipboardHistory(100)
+      const data = await clipboardService.getClipboardHistory(20)
       setHistory(data)
     } catch (err) {
       setError('Failed to load clipboard history')
@@ -325,7 +328,7 @@ export const ClipboardPanel = forwardRef(({ onConvertToSnippet, onClipboardChang
     <div className="h-full flex flex-col bg-background">
       {/* Header */}
       <div className="p-3 border-b">
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2">
           <Clipboard className="h-4 w-4" />
           <h2 className="text-sm font-semibold">Clipboard History</h2>
           <Badge variant="secondary" className="text-[9px]">
@@ -436,57 +439,69 @@ export const ClipboardPanel = forwardRef(({ onConvertToSnippet, onClipboardChang
             <p className="text-[10px]">No clipboard history yet</p>
           </div>
         ) : (
-          filteredHistory.map((entry) => (
-            <div
-              key={entry.id}
-              className="p-2 border rounded-md bg-accent/30 hover:bg-accent/50 transition-colors"
-            >
-              <div className="flex items-start gap-2">
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] text-muted-foreground mb-1">
-                    {new Date(entry.created_at).toLocaleString()}
-                  </p>
-                  <p className="text-[11px] text-foreground break-words line-clamp-3 font-mono">
-                    {entry.content}
-                  </p>
-                  {entry.category && (
-                    <Badge variant="outline" className="text-[8px] mt-1">
-                      {entry.category}
-                    </Badge>
-                  )}
+          <>
+            {filteredHistory.slice(0, displayCount).map((entry) => (
+              <div
+                key={entry.id}
+                className="p-2.5 border rounded-lg bg-accent/30 hover:bg-accent/50 transition-colors"
+              >
+                <div className="flex items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-muted-foreground mb-1">
+                      {new Date(entry.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                    <p className="text-[11px] text-foreground break-words line-clamp-2 font-mono leading-relaxed">
+                      {entry.content.replace(/<[^>]*>/g, '')}
+                    </p>
+                    {entry.category && (
+                      <Badge variant="outline" className="text-[8px] mt-1">
+                        {entry.category}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-1 mt-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-[9px]"
+                    onClick={() => handleCopyEntry(entry.content)}
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-[9px]"
+                    onClick={() => handleConvertClick(entry)}
+                  >
+                    <FileCode className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-[9px] text-destructive hover:text-destructive"
+                    onClick={() => handleDeleteEntry(entry.id)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
                 </div>
               </div>
+            ))}
 
-              {/* Actions */}
-              <div className="flex gap-1 mt-2">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 px-2 text-[9px]"
-                  onClick={() => handleCopyEntry(entry.content)}
-                >
-                  <Copy className="h-3 w-3" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 px-2 text-[9px]"
-                  onClick={() => handleConvertClick(entry)}
-                >
-                  <FileCode className="h-3 w-3" />
-                  <span className="ml-1">Snippet</span>
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 px-2 text-[9px] text-destructive hover:text-destructive"
-                  onClick={() => handleDeleteEntry(entry.id)}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-          ))
+            {/* Load More Button */}
+            {filteredHistory.length > displayCount && (
+              <Button
+                variant="ghost"
+                className="w-full text-xs h-8 mt-2"
+                onClick={() => setDisplayCount(prev => prev + 20)}
+              >
+                Load {Math.min(20, filteredHistory.length - displayCount)} More
+              </Button>
+            )}
+          </>
         )}
       </div>
 

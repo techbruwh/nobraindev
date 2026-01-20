@@ -24,6 +24,9 @@ export const ClipboardMainView = forwardRef(({ onConvertToSnippet, onClipboardCh
   const [lastSyncTime, setLastSyncTime] = useState(null)
   const [syncApproval, setSyncApproval] = useState(null)
 
+  // Pagination state
+  const [displayCount, setDisplayCount] = useState(20)
+
   // Expose refreshClipboard function to parent
   useImperativeHandle(ref, () => ({
     refreshClipboard: () => {
@@ -84,7 +87,7 @@ export const ClipboardMainView = forwardRef(({ onConvertToSnippet, onClipboardCh
     setIsLoading(true)
     setError(null)
     try {
-      const data = await clipboardService.getClipboardHistory(100)
+      const data = await clipboardService.getClipboardHistory(20)
       setHistory(data)
     } catch (err) {
       setError('Failed to load clipboard history')
@@ -335,12 +338,12 @@ export const ClipboardMainView = forwardRef(({ onConvertToSnippet, onClipboardCh
       {/* Left Panel - Clipboard List */}
       <div className="w-[480px] border-r flex flex-col bg-background">
         {/* Header */}
-        <div className="p-4 border-b space-y-3">
+        <div className="p-3 border-b space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Clipboard className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">Clipboard History</h2>
-              <Badge variant="secondary" className="text-[10px]">
+              <Clipboard className="h-4 w-4" />
+              <h2 className="text-sm font-semibold">Clipboard History</h2>
+              <Badge variant="secondary" className="text-[9px]">
                 {history.length}
               </Badge>
             </div>
@@ -350,7 +353,7 @@ export const ClipboardMainView = forwardRef(({ onConvertToSnippet, onClipboardCh
               <Button
                 variant="ghost"
                 size="sm"
-                className={`h-8 px-3 text-[10px] gap-1.5 ${
+                className={`h-7 px-2 text-[9px] gap-1 ${
                   hasUnsyncedClipboard && !isSyncing
                     ? 'bg-yellow-500/20 text-yellow-600 hover:bg-yellow-500/30 hover:text-yellow-700'
                     : ''
@@ -372,13 +375,13 @@ export const ClipboardMainView = forwardRef(({ onConvertToSnippet, onClipboardCh
 
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               type="text"
               placeholder="Search clipboard..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 text-sm h-9"
+              className="pl-8 text-xs h-8"
             />
           </div>
         </div>
@@ -427,77 +430,89 @@ export const ClipboardMainView = forwardRef(({ onConvertToSnippet, onClipboardCh
               <p className="text-sm">No clipboard history yet</p>
             </div>
           ) : (
-            filteredHistory.map((entry) => (
-              <div
-                key={entry.id}
-                className={`p-3 border rounded-lg cursor-pointer transition-all ${
-                  selectedEntry?.id === entry.id
-                    ? 'bg-primary/10 border-primary'
-                    : 'bg-accent/30 hover:bg-accent/50 border-border'
-                }`}
-                onClick={() => {
-                  setSelectedEntry(entry)
-                  onEntrySelect?.(entry.id)
-                }}
-              >
-                <div className="flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Clock className="h-3 w-3 text-muted-foreground" />
-                      <p className="text-[11px] text-muted-foreground">
-                        {new Date(entry.created_at).toLocaleString()}
+            <>
+              {filteredHistory.slice(0, displayCount).map((entry) => (
+                <div
+                  key={entry.id}
+                  className={`p-2.5 border rounded-lg cursor-pointer transition-all ${
+                    selectedEntry?.id === entry.id
+                      ? 'bg-primary/10 border-primary'
+                      : 'bg-accent/30 hover:bg-accent/50 border-border'
+                  }`}
+                  onClick={() => {
+                    setSelectedEntry(entry)
+                    onEntrySelect?.(entry.id)
+                  }}
+                >
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Clock className="h-3 w-3 text-muted-foreground" />
+                        <p className="text-[10px] text-muted-foreground">
+                          {new Date(entry.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                      <p className="text-xs text-foreground break-words line-clamp-2 font-mono leading-relaxed">
+                        {entry.content.replace(/<[^>]*>/g, '')}
                       </p>
+                      {entry.category && (
+                        <Badge variant="outline" className="text-[8px]">
+                          {entry.category}
+                        </Badge>
+                      )}
                     </div>
-                    <p className="text-sm text-foreground break-words line-clamp-3 font-mono">
-                      {entry.content}
-                    </p>
-                    {entry.category && (
-                      <Badge variant="outline" className="text-[9px] mt-2">
-                        {entry.category}
-                      </Badge>
-                    )}
+                  </div>
+
+                  {/* Quick Actions */}
+                  <div className="flex gap-1 mt-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-[9px]"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleCopyEntry(entry.content)
+                      }}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-[9px]"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleConvertClick(entry)
+                      }}
+                    >
+                      <FileCode className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-[9px] text-destructive hover:text-destructive ml-auto"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteEntry(entry.id)
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
                   </div>
                 </div>
+              ))}
 
-                {/* Quick Actions */}
-                <div className="flex gap-1.5 mt-3 pt-3 border-t">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 px-2 text-[10px]"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleCopyEntry(entry.content)
-                    }}
-                  >
-                    <Copy className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 px-2 text-[10px]"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleConvertClick(entry)
-                    }}
-                  >
-                    <FileCode className="h-3 w-3" />
-                    <span className="ml-1">Snippet</span>
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 px-2 text-[10px] text-destructive hover:text-destructive ml-auto"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDeleteEntry(entry.id)
-                    }}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-            ))
+              {/* Load More Button */}
+              {filteredHistory.length > displayCount && (
+                <Button
+                  variant="ghost"
+                  className="w-full text-xs h-8"
+                  onClick={() => setDisplayCount(prev => prev + 20)}
+                >
+                  Load {Math.min(20, filteredHistory.length - displayCount)} More
+                </Button>
+              )}
+            </>
           )}
         </div>
 

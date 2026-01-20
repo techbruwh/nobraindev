@@ -1,14 +1,14 @@
-import { Search, Plus, FileCode, Trash2, Copy, AlertCircle, RefreshCw, Cloud, CheckCircle, Loader2, ArrowUp, Shield } from 'lucide-react'
+import { Search, Plus, FileCode, Trash2, Copy, AlertCircle, RefreshCw, Cloud, CheckCircle, Loader2, ArrowUp, Shield, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useEffect, useRef, useState } from 'react'
 import { useSupabaseAuth } from '@/lib/supabase-auth'
 import { syncService } from '@/lib/sync'
 
-export function SnippetsPanel({ 
-  snippets, 
-  currentSnippet, 
-  onSnippetClick, 
+export function SnippetsPanel({
+  snippets,
+  currentSnippet,
+  onSnippetClick,
   onNewSnippet,
   onDeleteSnippet,
   sidebarCollapsed,
@@ -23,11 +23,14 @@ export function SnippetsPanel({
   const snippetRefs = useRef({})
   const containerRef = useRef(null)
   const [deletingId, setDeletingId] = useState(null)
-  
+
   // Sync state
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncStatus, setSyncStatus] = useState(null)
   const [syncApproval, setSyncApproval] = useState(null)
+
+  // Pagination state
+  const [displayCount, setDisplayCount] = useState(20)
 
   // Auto-scroll to selected snippet when it changes
   useEffect(() => {
@@ -212,55 +215,76 @@ export function SnippetsPanel({
             <p className="text-[10px]">No snippets yet</p>
           </div>
         ) : (
-          snippets.map((snippet) => (
-            <div
-              key={snippet.id}
-              ref={(el) => snippetRefs.current[snippet.id] = el}
-              onClick={() => onSnippetClick(snippet)}
-              className={`p-2.5 border rounded-lg cursor-pointer transition-all ${
-                currentSnippet?.id === snippet.id 
-                  ? 'bg-accent border-primary/50 ring-1 ring-primary/20 shadow-sm' 
-                  : 'bg-accent/30 border-border/50 hover:bg-accent/50 hover:border-border hover:shadow-sm'
-              }`}
-            >
-              <div className="flex items-start gap-2">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-[11px] font-medium truncate mb-1">
-                    {snippet.title}
-                  </h3>
-                  <p className="text-[10px] text-muted-foreground mb-1">
-                    {new Date(snippet.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </p>
-                  {snippet.content && (
-                    <p className="text-[10px] text-muted-foreground line-clamp-2 font-mono leading-relaxed">
-                      {snippet.content.replace(/<[^>]*>/g, '').substring(0, 100)}
-                    </p>
-                  )}
+          <>
+            {snippets.slice(0, displayCount).map((snippet) => (
+              <div
+                key={snippet.id}
+                ref={(el) => snippetRefs.current[snippet.id] = el}
+                onClick={() => onSnippetClick(snippet)}
+                className={`p-2.5 border rounded-lg cursor-pointer transition-all ${
+                  currentSnippet?.id === snippet.id
+                    ? 'bg-accent border-primary/50 ring-1 ring-primary/20 shadow-sm'
+                    : 'bg-accent/30 border-border/50 hover:bg-accent/50 hover:border-border hover:shadow-sm'
+                }`}
+              >
+                <div className="flex items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-[11px] font-medium truncate mb-1">
+                      {snippet.title}
+                    </h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Clock className="h-3 w-3 text-muted-foreground" />
+                      <p className="text-[11px] text-muted-foreground">
+                        {new Date(snippet.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                      {snippet.language && (
+                        <Badge variant="secondary" className="text-[8px]">
+                          {snippet.language}
+                        </Badge>
+                      )}
+                    </div>
+                    {snippet.content && (
+                      <p className="text-[11px] text-muted-foreground line-clamp-2 font-mono leading-relaxed">
+                        {snippet.content.replace(/<[^>]*>/g, '').substring(0, 100)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-1 mt-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-[9px]"
+                    onClick={(e) => handleCopySnippet(e, snippet.content)}
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-[9px] text-destructive hover:text-destructive"
+                    onClick={(e) => handleDeleteClick(e, snippet)}
+                    disabled={deletingId === snippet.id || isDeleting}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
                 </div>
               </div>
+            ))}
 
-              {/* Actions */}
-              <div className="flex gap-1 mt-2">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 px-2 text-[9px]"
-                  onClick={(e) => handleCopySnippet(e, snippet.content)}
-                >
-                  <Copy className="h-3 w-3" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 px-2 text-[9px] text-destructive hover:text-destructive"
-                  onClick={(e) => handleDeleteClick(e, snippet)}
-                  disabled={deletingId === snippet.id || isDeleting}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-          ))
+            {/* Load More Button */}
+            {snippets.length > displayCount && (
+              <Button
+                variant="ghost"
+                className="w-full text-xs h-8 mt-2"
+                onClick={() => setDisplayCount(prev => prev + 20)}
+              >
+                Load {Math.min(20, snippets.length - displayCount)} More
+              </Button>
+            )}
+          </>
         )}
       </div>
 
