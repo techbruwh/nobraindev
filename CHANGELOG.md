@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.6] - 2026-01-20
+
+### 🐛 Bug Fixes
+-  add mainview in account to showcase feature
+-  edit link and remove link bug
+-  improve UX for all panels
+-  improve UX account panel
+-  improve UX for table editor
+-  improve link handling
+
+
+
 ## [1.5.5] - 2026-01-19
 
 ### ✨ Features
