@@ -14,7 +14,9 @@ import { ConfirmDialog } from '@/components/ui/confirmdialog'
 import { MenuSidebar } from '@/components/ui/menusidebar'
 import { SnippetsPanel } from '@/components/ui/snippetspanel'
 import { AccountPanel } from '@/components/ui/accountpanel'
+import { AccountMainView } from '@/components/ui/accountmainview'
 import { ClipboardPanel } from '@/components/ui/clipboardpanel'
+import { ClipboardMainView } from '@/components/ui/clipboardmainview'
 import { TiptapEditor } from '@/components/ui/tiptap-editor'
 import './tiptap.css'
 
@@ -90,6 +92,9 @@ function App() {
 
   // Track if clipboard has been modified
   const [hasUnsyncedClipboard, setHasUnsyncedClipboard] = useState(false)
+
+  // Selected clipboard entry ID
+  const [selectedClipboardEntryId, setSelectedClipboardEntryId] = useState(null)
 
   // Deletion tracking state
   const [isDeletingSnippet, setIsDeletingSnippet] = useState(false)
@@ -765,11 +770,11 @@ function App() {
         />
 
         {/* Resizable Content Sidebar */}
-        <div 
+        <div
           className={`border-r flex flex-col transition-all duration-300 ${
-            sidebarCollapsed ? 'w-0 overflow-hidden' : ''
+            sidebarCollapsed || activeMenu === 'clipboard' || activeMenu === 'account' ? 'w-0 overflow-hidden' : ''
           }`}
-          style={{ width: sidebarCollapsed ? 0 : `${sidebarWidth}px` }}
+          style={{ width: (sidebarCollapsed || activeMenu === 'clipboard' || activeMenu === 'account') ? 0 : `${sidebarWidth}px` }}
         >
           {activeMenu === 'snippets' && (
             <SnippetsPanel
@@ -800,43 +805,10 @@ function App() {
               }}
             />
           )}
-          
-          {activeMenu === 'clipboard' && (
-            <ClipboardPanel
-              ref={clipboardPanelRef}
-              onConvertToSnippet={() => {
-                setActiveMenu('snippets')
-                loadSnippets()
-                setHasUnsyncedChanges(true)
-              }}
-              onClipboardChanged={() => {
-                setHasUnsyncedClipboard(true)
-              }}
-              hasUnsyncedClipboard={hasUnsyncedClipboard}
-              onClipboardSyncComplete={(syncTime) => {
-                setHasUnsyncedClipboard(false)
-                setLastSyncTime(syncTime)
-              }}
-            />
-          )}
-
-          {activeMenu === 'account' && (
-            <AccountPanel 
-              hasUnsyncedChanges={hasUnsyncedChanges}
-              lastSyncTime={lastSyncTime}
-              onSyncComplete={(syncTime) => {
-                setHasUnsyncedChanges(false)
-                setLastSyncTime(syncTime)
-              }}
-              onSyncStart={() => {
-                // Optionally handle sync start
-              }}
-            />
-          )}
         </div>
 
         {/* Resize Handle */}
-        {!sidebarCollapsed && (
+        {!sidebarCollapsed && activeMenu !== 'clipboard' && activeMenu !== 'account' && (
           <div
             className="w-1 hover:w-1.5 bg-border hover:bg-primary cursor-col-resize transition-all flex-shrink-0"
             onMouseDown={handleMouseDown}
@@ -846,105 +818,145 @@ function App() {
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          {/* Top Bar */}
-          <div className="border-b px-3 py-1.5 flex items-center gap-2 bg-background">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            >
-              {sidebarCollapsed ? <PanelLeft className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
-            </Button>
-
-            {/* Auto-save indicator */}
-            {currentSnippet || (title && content) ? (
-              <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-muted/50">
-                <Sparkles className="h-3 w-3 text-primary" />
-                <span className="text-[10px] text-muted-foreground">
-                  Auto-save enabled
-                </span>
-                {hasUnsavedChanges() && (
-                  <span className="text-[10px] text-yellow-600 dark:text-yellow-400">
-                    • Unsaved changes
-                  </span>
-                )}
-              </div>
-            ) : null}
-
-            {/* Spacer to push buttons to the right */}
-            <div className="flex-1"></div>
-
-            {/* Action Buttons - Only for current snippet */}
-            {currentSnippet ? (
-              <div className="flex items-center gap-1.5">
-                <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px]" onClick={() => handleCopyCode(currentSnippet.content)}>
-                  <Copy className="h-3 w-3 mr-1" />
-                  Copy
-                </Button>
-                <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] text-destructive hover:text-destructive" onClick={() => handleDeleteSnippet(currentSnippet)}>
-                  <Trash2 className="h-3 w-3 mr-1" />
-                  Delete
-                </Button>
-              </div>
-            ) : null}
-          </div>
-
-          {/* Content Area */}
-          {!currentSnippet && !isEditing && !title && !content ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center">
-                <FileCode className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                <h2 className="text-lg font-semibold mb-1.5">Select a snippet</h2>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Or create a new one to get started
-                </p>
-                <Button onClick={handleNewSnippet}>
-                  <Plus className="h-3.5 w-3.5 mr-1.5" />
-                  New Snippet
-                </Button>
-                <p className="text-[10px] text-muted-foreground mt-3">
-                  Press <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px]">⌘ N</kbd> to create a new snippet
-                </p>
-              </div>
+          {/* Show Clipboard Main View when clipboard is active */}
+          {activeMenu === 'clipboard' ? (
+            <div className="flex-1 overflow-hidden">
+              <ClipboardMainView
+                ref={clipboardPanelRef}
+                onConvertToSnippet={() => {
+                  setActiveMenu('snippets')
+                  loadSnippets()
+                  setHasUnsyncedChanges(true)
+                }}
+                onClipboardChanged={() => {
+                  setHasUnsyncedClipboard(true)
+                }}
+                hasUnsyncedClipboard={hasUnsyncedClipboard}
+                onClipboardSyncComplete={(syncTime) => {
+                  setHasUnsyncedClipboard(false)
+                  setLastSyncTime(syncTime)
+                }}
+                selectedEntryId={selectedClipboardEntryId}
+                onEntrySelect={setSelectedClipboardEntryId}
+              />
+            </div>
+          ) : activeMenu === 'account' ? (
+            <div className="flex-1 overflow-hidden">
+              <AccountMainView
+                hasUnsyncedChanges={hasUnsyncedChanges}
+                lastSyncTime={lastSyncTime}
+                onSyncComplete={(syncTime) => {
+                  setHasUnsyncedChanges(false)
+                  setLastSyncTime(syncTime)
+                }}
+                onSyncStart={() => {
+                  // Optionally handle sync start
+                }}
+              />
             </div>
           ) : (
-            // Always Edit Mode
-            <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="flex-1 overflow-auto p-2">
-                <TiptapEditor
-                  content={content || ''}
-                  onChange={(newContent) => {
-                    setContent(newContent)
-                    // Auto-detect title from first heading or first line
-                    const tempDiv = document.createElement('div')
-                    tempDiv.innerHTML = newContent
+            <>
+              {/* Top Bar */}
+              <div className="border-b px-3 py-1.5 flex items-center gap-2 bg-background">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                >
+                  {sidebarCollapsed ? <PanelLeft className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
+                </Button>
 
-                    // Try to get first heading
-                    const firstHeading = tempDiv.querySelector('h1, h2, h3, h4, h5, h6')
-                    if (firstHeading && firstHeading.textContent?.trim()) {
-                      setTitle(firstHeading.textContent.trim().substring(0, 100))
-                      return
-                    }
+                {/* Auto-save indicator */}
+                {currentSnippet || (title && content) ? (
+                  <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-muted/50">
+                    <Sparkles className="h-3 w-3 text-primary" />
+                    <span className="text-[10px] text-muted-foreground">
+                      Auto-save enabled
+                    </span>
+                    {hasUnsavedChanges() && (
+                      <span className="text-[10px] text-yellow-600 dark:text-yellow-400">
+                        • Unsaved changes
+                      </span>
+                    )}
+                  </div>
+                ) : null}
 
-                    // Otherwise get first paragraph or line
-                    const firstParagraph = tempDiv.querySelector('p')
-                    if (firstParagraph && firstParagraph.textContent?.trim()) {
-                      setTitle(firstParagraph.textContent.trim().substring(0, 100))
-                      return
-                    }
+                {/* Spacer to push buttons to the right */}
+                <div className="flex-1"></div>
 
-                    // Fallback to first non-empty text
-                    const allText = tempDiv.textContent?.trim() || ''
-                    const firstLine = allText.split('\n').find(line => line.trim()) || ''
-                    if (firstLine) {
-                      setTitle(firstLine.trim().substring(0, 100))
-                    }
-                  }}
-                  editable={true}
-                  autoFocus={true}
-                />
+                {/* Action Buttons - Only for current snippet */}
+                {currentSnippet ? (
+                  <div className="flex items-center gap-1.5">
+                    <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px]" onClick={() => handleCopyCode(currentSnippet.content)}>
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copy
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] text-destructive hover:text-destructive" onClick={() => handleDeleteSnippet(currentSnippet)}>
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Delete
+                    </Button>
+                  </div>
+                ) : null}
               </div>
-            </div>
+
+              {/* Content Area */}
+              {!currentSnippet && !isEditing && !title && !content ? (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <FileCode className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                    <h2 className="text-lg font-semibold mb-1.5">Select a snippet</h2>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Or create a new one to get started
+                    </p>
+                    <Button onClick={handleNewSnippet}>
+                      <Plus className="h-3.5 w-3.5 mr-1.5" />
+                      New Snippet
+                    </Button>
+                    <p className="text-[10px] text-muted-foreground mt-3">
+                      Press <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px]">⌘ N</kbd> to create a new snippet
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                // Always Edit Mode
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <div className="flex-1 overflow-auto p-2">
+                    <TiptapEditor
+                      content={content || ''}
+                      onChange={(newContent) => {
+                        setContent(newContent)
+                        // Auto-detect title from first heading or first line
+                        const tempDiv = document.createElement('div')
+                        tempDiv.innerHTML = newContent
+
+                        // Try to get first heading
+                        const firstHeading = tempDiv.querySelector('h1, h2, h3, h4, h5, h6')
+                        if (firstHeading && firstHeading.textContent?.trim()) {
+                          setTitle(firstHeading.textContent.trim().substring(0, 100))
+                          return
+                        }
+
+                        // Otherwise get first paragraph or line
+                        const firstParagraph = tempDiv.querySelector('p')
+                        if (firstParagraph && firstParagraph.textContent?.trim()) {
+                          setTitle(firstParagraph.textContent.trim().substring(0, 100))
+                          return
+                        }
+
+                        // Fallback to first non-empty text
+                        const allText = tempDiv.textContent?.trim() || ''
+                        const firstLine = allText.split('\n').find(line => line.trim()) || ''
+                        if (firstLine) {
+                          setTitle(firstLine.trim().substring(0, 100))
+                        }
+                      }}
+                      editable={true}
+                      autoFocus={true}
+                    />
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
