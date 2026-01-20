@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { listen } from '@tauri-apps/api/event'
+import { open } from '@tauri-apps/plugin-shell'
 import { Plus, Search, FileCode, X, Edit, Trash2, Copy, Save, Brain, Download, Sparkles, CheckCircle, AlertCircle, Info, PanelLeftClose, PanelLeft, Keyboard, Code, Braces, RefreshCw, Cloud, User } from 'lucide-react'
 import { useSupabaseAuth } from '@/lib/supabase-auth'
 import { syncService } from '@/lib/sync'
@@ -324,6 +325,28 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sidebarCollapsed, showShortcutsHelp, isSearchModalOpen, activeMenu, confirmDialog])
+
+  // Handle global link clicks to open in external browser
+  useEffect(() => {
+    const handleLinkClick = async (e) => {
+      const target = e.target
+      // Check if clicked element is a link or inside a link
+      const link = target.closest('a')
+
+      if (link && link.href) {
+        const href = link.getAttribute('href')
+        // Only handle external links (http/https)
+        if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+          e.preventDefault()
+          e.stopPropagation()
+          await open(href).catch(console.error)
+        }
+      }
+    }
+
+    document.addEventListener('click', handleLinkClick, true) // Use capture phase
+    return () => document.removeEventListener('click', handleLinkClick, true)
+  }, [])
 
 
   const loadSnippets = async () => {

@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useEditor, EditorContent, ReactNodeViewRenderer } from '@tiptap/react'
 import { Extension } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
+import { open } from '@tauri-apps/plugin-shell'
 import * as UnderlineExt from '@tiptap/extension-underline'
 import * as TextStyleExt from '@tiptap/extension-text-style'
 import * as ColorExt from '@tiptap/extension-color'
@@ -156,7 +157,6 @@ import {
   Palette,
   ChevronDown,
   FileCode2,
-  ExternalLink,
   Edit3,
   Trash2,
   Plus,
@@ -364,45 +364,115 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
     }
   }, [autoFocus, editor])
 
-  // Handle clicks on links to show popup
+  // Handle clicks and hovers on links
   useEffect(() => {
     if (!editor || !editor.view || !editor.view.dom) return
 
-    const handleClick = (event) => {
+    let hoverTimeout = null
+
+    const handleClick = async (event) => {
       if (!isMountedRef.current) return
-      
+
       const target = event.target
-      
+
       // Check if clicked on a link
       if (target.tagName === 'A' && target.href) {
-        event.preventDefault()
-        
-        const rect = target.getBoundingClientRect()
         const url = target.getAttribute('href')
-        
-        setCurrentLinkUrl(url)
-        setLinkPopupPosition({
-          top: rect.bottom + window.scrollY + 8,
-          left: rect.left + window.scrollX
-        })
-        setShowLinkPopup(true)
-        setIsEditingLink(false)
-      } else if (!linkPopupRef.current?.contains(target)) {
-        setShowLinkPopup(false)
+
+        // Only open link if Cmd/Ctrl key is pressed
+        if (event.metaKey || event.ctrlKey) {
+          event.preventDefault()
+          try {
+            await open(url)
+          } catch (error) {
+            console.error('Failed to open link:', error)
+          }
+        } else {
+          // Regular click on link - prevent default and show popup
+          event.preventDefault()
+          const rect = target.getBoundingClientRect()
+
+          setCurrentLinkUrl(url)
+          setLinkPopupPosition({
+            top: rect.bottom + window.scrollY + 8,
+            left: rect.left + window.scrollX
+          })
+          setShowLinkPopup(true)
+          setIsEditingLink(false)
+        }
+      }
+    }
+
+    const handleMouseEnter = (event) => {
+      if (!isMountedRef.current) return
+
+      const target = event.target
+
+      // Check if hovering on a link
+      if (target.tagName === 'A' && target.href && editable) {
+        // Clear any existing timeout
+        if (hoverTimeout) {
+          clearTimeout(hoverTimeout)
+        }
+
+        // Show popup after a short delay
+        hoverTimeout = setTimeout(() => {
+          if (!isMountedRef.current) return
+
+          const url = target.getAttribute('href')
+          const rect = target.getBoundingClientRect()
+
+          setCurrentLinkUrl(url)
+          setLinkPopupPosition({
+            top: rect.bottom + window.scrollY + 8,
+            left: rect.left + window.scrollX
+          })
+          setShowLinkPopup(true)
+          setIsEditingLink(false)
+        }, 300) // 300ms delay before showing popup
+      }
+    }
+
+    const handleMouseLeave = () => {
+      // Clear the timeout if mouse leaves before popup appears
+      if (hoverTimeout) {
+        clearTimeout(hoverTimeout)
+        hoverTimeout = null
       }
     }
 
     const editorElement = editor.view.dom
     editorElement.addEventListener('click', handleClick)
+    editorElement.addEventListener('mouseenter', handleMouseEnter, true)
+    editorElement.addEventListener('mouseleave', handleMouseLeave, true)
 
     return () => {
       try {
+        if (hoverTimeout) {
+          clearTimeout(hoverTimeout)
+        }
         editorElement.removeEventListener('click', handleClick)
+        editorElement.removeEventListener('mouseenter', handleMouseEnter, true)
+        editorElement.removeEventListener('mouseleave', handleMouseLeave, true)
       } catch (error) {
         // Ignore cleanup errors
       }
     }
-  }, [editor])
+  }, [editor, editable])
+
+  // Close popup when clicking outside
+  useEffect(() => {
+    if (!showLinkPopup) return
+
+    const handleClickOutside = (event) => {
+      if (linkPopupRef.current && !linkPopupRef.current.contains(event.target)) {
+        setShowLinkPopup(false)
+      }
+    }
+
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [showLinkPopup])
 
   // Update current language when cursor moves into a code block
   useEffect(() => {
@@ -685,15 +755,6 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
       editor.chain().focus().extendMarkRange('link').unsetLink().run()
       setShowLinkPopup(false)
     }
-  }
-
-  const openLink = (url) => {
-    // Use anchor tag click to open link - Tauri will handle it
-    const a = document.createElement('a')
-    a.href = url
-    a.target = '_blank'
-    a.rel = 'noopener noreferrer'
-    a.click()
   }
 
   const addImage = () => {
@@ -1096,9 +1157,9 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
       </div>
       )}
 
-      {/* Link Popup - shows when clicking on a link */}
+      {/* Link Popup - shows when hovering/clicking on a link */}
       {showLinkPopup && (
-        <div 
+        <div
           ref={linkPopupRef}
           className="fixed bg-background border rounded-lg shadow-lg p-2 z-50 min-w-[300px]"
           style={{
@@ -1138,32 +1199,17 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Link2 className="h-3 w-3 shrink-0" />
-                <a 
-                  href={currentLinkUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex-1 truncate hover:text-primary"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {currentLinkUrl}
-                </a>
+                <span className="flex-1 truncate">{currentLinkUrl}</span>
               </div>
-              <div className="flex gap-1 justify-center">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 w-8 p-0"
-                  onClick={() => openLink(currentLinkUrl)}
-                >
-                  <ExternalLink className="h-4 w-4" />
-                </Button>
-                {editable && (
-                  <>
+              {editable && (
+                <>
+                  <div className="flex gap-1 justify-center">
                     <Button
                       size="sm"
                       variant="outline"
                       className="h-8 w-8 p-0"
                       onClick={() => setIsEditingLink(true)}
+                      title="Edit link"
                     >
                       <Edit3 className="h-4 w-4" />
                     </Button>
@@ -1172,12 +1218,16 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
                       variant="destructive"
                       className="h-8 w-8 p-0"
                       onClick={removeLink}
+                      title="Remove link"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
-                  </>
-                )}
-              </div>
+                  </div>
+                  <p className="text-[9px] text-muted-foreground text-center">
+                    <kbd className="px-1 bg-muted rounded">Cmd/Ctrl</kbd> + Click to open
+                  </p>
+                </>
+              )}
             </div>
           )}
         </div>
