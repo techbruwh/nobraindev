@@ -16,7 +16,8 @@ export function SnippetsPanel({
   error = null,
   hasUnsyncedChanges,
   onSyncComplete,
-  onSyncStart
+  onSyncStart,
+  newSnippetIds = new Set()
 }) {
   const { user } = useSupabaseAuth()
   const isSignedIn = !!user
@@ -229,9 +230,16 @@ export function SnippetsPanel({
               >
                 <div className="flex items-start gap-2">
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-[11px] font-medium truncate mb-1">
-                      {snippet.title}
-                    </h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-[11px] font-medium truncate">
+                        {snippet.title}
+                      </h3>
+                      {newSnippetIds.has(snippet.id) && (
+                        <Badge className="text-[8px] px-1.5 py-0 bg-green-500 text-white hover:bg-green-600">
+                          NEW
+                        </Badge>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 mb-1">
                       <Clock className="h-3 w-3 text-muted-foreground" />
                       <p className="text-[11px] text-muted-foreground">

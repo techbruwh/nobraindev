@@ -96,6 +96,9 @@ function App() {
   // Selected clipboard entry ID
   const [selectedClipboardEntryId, setSelectedClipboardEntryId] = useState(null)
 
+  // Track newly created snippet IDs
+  const [newSnippetIds, setNewSnippetIds] = useState(new Set())
+
   // Deletion tracking state
   const [isDeletingSnippet, setIsDeletingSnippet] = useState(false)
   const [deleteError, setDeleteError] = useState(null)
@@ -483,16 +486,81 @@ function App() {
     }
   }
 
-  const handleNewSnippet = () => {
+  const handleNewSnippet = async () => {
     console.log('🆕 Creating new snippet')
-    setCurrentSnippet(null)
+
+    // Switch to snippets menu if not already there
+    if (activeMenu !== 'snippets') {
+      setActiveMenu('snippets')
+    }
+
+    // Ensure sidebar is expanded
+    if (sidebarCollapsed) {
+      setSidebarCollapsed(false)
+    }
+
     setIsEditing(true)
     setTitle('Untitled')
     setLanguage('javascript')
     setTags('')
     setDescription('')
     setContent('')
-    console.log('✅ New snippet state set')
+
+    // Immediately create the snippet
+    const snippet = {
+      title: 'Untitled',
+      language: 'javascript',
+      tags: null,
+      description: null,
+      content: '',
+      created_at: '',
+      updated_at: ''
+    }
+
+    try {
+      await invoke('create_snippet', { snippet })
+
+      // Mark as having unsynced changes
+      setHasUnsyncedChanges(true)
+
+      // Reload snippets
+      await loadSnippets()
+
+      // Find and select the newly created "Untitled" snippet
+      setSnippets(prev => {
+        const newSnippet = prev.find(s => s.title === 'Untitled' && !newSnippetIds.has(s.id))
+        if (newSnippet) {
+          setCurrentSnippet(newSnippet)
+          setIsEditing(false)
+
+          // Track as new snippet
+          setNewSnippetIds(prevIds => new Set([...prevIds, newSnippet.id]))
+
+          // Remove NEW badge after 5 seconds
+          setTimeout(() => {
+            setNewSnippetIds(ids => {
+              const newIds = new Set(ids)
+              newIds.delete(newSnippet.id)
+              return newIds
+            })
+          }, 5000)
+
+          // Update last saved state to prevent immediate re-save
+          lastSavedStateRef.current = {
+            id: newSnippet.id,
+            title: newSnippet.title,
+            content: newSnippet.content,
+            language: newSnippet.language,
+            tags: newSnippet.tags || '',
+            description: newSnippet.description || ''
+          }
+        }
+        return prev
+      })
+    } catch (error) {
+      console.error('Failed to create snippet:', error)
+      showToast('Failed to create snippet', 'error')
+    }
   }
 
   const handleEditSnippet = (snippet) => {
@@ -803,6 +871,7 @@ function App() {
               onSyncStart={() => {
                 // Optionally handle sync start
               }}
+              newSnippetIds={newSnippetIds}
             />
           )}
         </div>
