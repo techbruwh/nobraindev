@@ -156,6 +156,9 @@ import {
   ListTodo,
   Palette,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
   FileCode2,
   Edit3,
   Trash2,
@@ -660,26 +663,43 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           return
         }
 
-        // Get the cursor coordinates
+        // Get the DOM node at the cursor position
         const { from } = editor.state.selection
-        const coords = editor.view.coordsAtPos(from)
+        const domAtPos = editor.view.domAtPos(from)
 
-        // Position table menu above the cursor
-        const menuWidth = 300 // approximate width
+        // Traverse up the DOM tree to find the table element
+        let tableNode = domAtPos.node
+        if (tableNode.nodeType === Node.TEXT_NODE) {
+          tableNode = tableNode.parentElement
+        }
+
+        tableNode = tableNode?.closest('table')
+
+        if (!tableNode) {
+          setShowTableMenu(false)
+          return
+        }
+
+        // Get the table's bounding rectangle
+        const tableRect = tableNode.getBoundingClientRect()
+
+        // Position table menu centered above the table
+        const menuWidth = 280 // approximate width
         const menuHeight = 40 // approximate height
 
-        let top = coords.top - menuHeight - 8
-        let left = coords.left + window.scrollX - (menuWidth / 2)
+        let top = tableRect.top + window.scrollY - menuHeight - 8
+        let left = tableRect.left + window.scrollX + (tableRect.width / 2) - (menuWidth / 2)
 
-        // Keep menu on screen
+        // Keep menu on screen horizontally
         if (left < 10) left = 10
         if (left + menuWidth > window.innerWidth - 10) {
           left = window.innerWidth - menuWidth - 10
         }
 
+        // Keep menu on screen vertically
         if (top < 10) {
-          // If no room above, show below
-          top = coords.bottom + 8
+          // If no room above, show below the table
+          top = tableRect.bottom + window.scrollY + 8
         }
 
         setTableMenuPosition({ top, left })
@@ -1454,7 +1474,7 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
       {editable && showTableMenu && (
         <div
           ref={tableMenuRef}
-          className="fixed bg-background border rounded-lg shadow-lg p-1 flex gap-1 items-center z-50 transition-opacity"
+          className="fixed bg-background border rounded-md shadow-xl p-1.5 flex gap-1 items-center z-50"
           style={{
             top: `${tableMenuPosition.top}px`,
             left: `${tableMenuPosition.left}px`,
@@ -1470,77 +1490,90 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
             isInteractingWithMenuRef.current = true
           }}
         >
-          <div className="flex items-center gap-1">
-            {/* Column operations */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0"
-              onClick={() => editor.chain().focus().addColumnBefore().run()}
-              title="Add column before"
-            >
-              <Columns className="h-3.5 w-3.5" />
-              <Plus className="h-2 w-2 absolute -top-0.5 -right-0.5" />
-            </Button>
+          {/* Add column before */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 relative"
+            onClick={() => editor.chain().focus().addColumnBefore().run()}
+            title="Add column before"
+          >
+            <Columns className="h-4 w-4" />
+            <ChevronLeft className="h-3 w-3 absolute -left-0.5 top-1/2 -translate-y-1/2" />
+          </Button>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0"
-              onClick={() => editor.chain().focus().addColumnAfter().run()}
-              title="Add column after"
-            >
-              <Columns className="h-3.5 w-3.5" />
-              <Plus className="h-2 w-2 absolute -bottom-0.5 -right-0.5" />
-            </Button>
+          {/* Add column after */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 relative"
+            onClick={() => editor.chain().focus().addColumnAfter().run()}
+            title="Add column after"
+          >
+            <Columns className="h-4 w-4" />
+            <ChevronRight className="h-3 w-3 absolute -right-0.5 top-1/2 -translate-y-1/2" />
+          </Button>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0"
-              onClick={() => editor.chain().focus().deleteColumn().run()}
-              title="Delete column"
-            >
-              <Columns className="h-3.5 w-3.5" />
-              <MinusIcon className="h-2 w-2 absolute -bottom-0.5 -right-0.5 text-destructive" />
-            </Button>
+          {/* Delete column */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={() => editor.chain().focus().deleteColumn().run()}
+            title="Delete column"
+          >
+            <Columns className="h-4 w-4" />
+          </Button>
 
-            <div className="w-px h-5 bg-border mx-1" />
+          <div className="w-px h-6 bg-border mx-1" />
 
-            {/* Row operations */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0"
-              onClick={() => editor.chain().focus().addRowBefore().run()}
-              title="Add row before"
-            >
-              <Rows className="h-3.5 w-3.5" />
-              <Plus className="h-2 w-2 absolute -top-0.5 -right-0.5" />
-            </Button>
+          {/* Add row before */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 relative"
+            onClick={() => editor.chain().focus().addRowBefore().run()}
+            title="Add row before"
+          >
+            <Rows className="h-4 w-4" />
+            <ChevronUp className="h-3 w-3 absolute left-1/2 -translate-x-1/2 -top-0.5" />
+          </Button>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0"
-              onClick={() => editor.chain().focus().addRowAfter().run()}
-              title="Add row after"
-            >
-              <Rows className="h-3.5 w-3.5" />
-              <Plus className="h-2 w-2 absolute -bottom-0.5 -right-0.5" />
-            </Button>
+          {/* Add row after */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 relative"
+            onClick={() => editor.chain().focus().addRowAfter().run()}
+            title="Add row after"
+          >
+            <Rows className="h-4 w-4" />
+            <ChevronDown className="h-3 w-3 absolute left-1/2 -translate-x-1/2 -bottom-0.5" />
+          </Button>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0"
-              onClick={() => editor.chain().focus().deleteRow().run()}
-              title="Delete row"
-            >
-              <Rows className="h-3.5 w-3.5" />
-              <MinusIcon className="h-2 w-2 absolute -bottom-0.5 -right-0.5 text-destructive" />
-            </Button>
-          </div>
+          {/* Delete row */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={() => editor.chain().focus().deleteRow().run()}
+            title="Delete row"
+          >
+            <Rows className="h-4 w-4" />
+          </Button>
+
+          <div className="w-px h-6 bg-border mx-1" />
+
+          {/* Delete table */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={() => editor.chain().focus().deleteTable().run()}
+            title="Delete table"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
       )}
 
