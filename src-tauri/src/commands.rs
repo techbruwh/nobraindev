@@ -626,25 +626,43 @@ fn paste_internal(as_plain_text: bool) -> Result<(), String> {
         if let Some(bundle_id) = previous_app {
             println!("🎯 Pasting{} to previous app: {}", if as_plain_text { " as plain text" } else { "" }, bundle_id);
 
-            // Switch to the previous app using bundle ID and paste
-            let script = format!(
-                r#"
-                tell application id "{}"
-                    activate
-                end tell
-                delay 0.1
+            // Check if previous app is nobraindev itself - if so, skip activate to avoid deadlock
+            if bundle_id.contains("nobraindev") {
+                println!("⚠️  Previous app is NoBrainDev, skipping activate to prevent deadlock");
+
+                // Just send the keystroke without activate
+                let paste_script = r#"
                 tell application "System Events"
                     keystroke "v" using command down
                 end tell
-                "#,
-                bundle_id
-            );
+                "#;
 
-            Command::new("osascript")
-                .arg("-e")
-                .arg(&script)
-                .output()
-                .map_err(|e| format!("Failed to paste: {}", e))?;
+                Command::new("osascript")
+                    .arg("-e")
+                    .arg(paste_script)
+                    .output()
+                    .map_err(|e| format!("Failed to paste: {}", e))?;
+            } else {
+                // Switch to the previous app using bundle ID and paste
+                let script = format!(
+                    r#"
+                    tell application id "{}"
+                        activate
+                    end tell
+                    delay 0.1
+                    tell application "System Events"
+                        keystroke "v" using command down
+                    end tell
+                    "#,
+                    bundle_id
+                );
+
+                Command::new("osascript")
+                    .arg("-e")
+                    .arg(&script)
+                    .output()
+                    .map_err(|e| format!("Failed to paste: {}", e))?;
+            }
         } else {
             println!("⚠️  No previous app stored");
 
