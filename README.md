@@ -11,7 +11,8 @@
 </div>
 
 ## Features
-- **Organize snippets and clipboard** - Manage snippets and clipboard locally, (sync when you need).
+- **Organize snippets and clipboard** - Manage snippets and clipboard locally, (sync when you need)
+- **Smart clipboard manager** - Clipy or Maccy like clipboard manager
 - **Smart Search** - Keyword-based search with filtering by title, tags, and content
 - **AI Semantic Search** - Natural language search powered by Small Language Models (SLM)
 - **Offline First** - Works perfectly without internet, sync when online
