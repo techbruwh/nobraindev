@@ -52,6 +52,7 @@ fn main() {
             commands::register_clipboard_hotkey,
             commands::capture_previous_app,
             commands::paste_to_cursor,
+            commands::paste_as_plain_text,
             auth::store_user_token,
             auth::get_user_token,
             auth::clear_user_tokens,

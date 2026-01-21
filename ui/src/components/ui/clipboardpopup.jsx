@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search, FilePlus, Clock, Check, ChevronDown } from 'lucide-react'
+import { Search, FilePlus, Clock, Check, ChevronDown, Clipboard } from 'lucide-react'
 import { ClipboardService } from '@/lib/clipboard'
 import { Button } from '@/components/ui/button'
 import { listen, emit } from '@tauri-apps/api/event'
@@ -184,12 +184,21 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
         return
       }
 
-      // Enter - paste selected entry to active cursor
-      if (e.key === 'Enter' && filteredEntries.length > 0) {
+      // Enter - paste selected entry to active cursor (with formatting)
+      if (e.key === 'Enter' && !e.shiftKey && filteredEntries.length > 0) {
         e.preventDefault()
         e.stopPropagation()
         const entry = filteredEntries[selectedIndex]
-        pasteToClipboard(entry)
+        pasteToClipboard(entry, false)
+        return
+      }
+
+      // Shift+Enter - paste selected entry without formatting
+      if (e.key === 'Enter' && e.shiftKey && filteredEntries.length > 0) {
+        e.preventDefault()
+        e.stopPropagation()
+        const entry = filteredEntries[selectedIndex]
+        pasteToClipboard(entry, true)
         return
       }
     }
@@ -294,19 +303,26 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
     }
   }
 
-  async function pasteToClipboard(entry) {
+  async function pasteToClipboard(entry, asPlainText = false) {
     try {
       // First copy to clipboard
       await navigator.clipboard.writeText(entry.content)
 
-      // Paste to cursor WITHOUT closing popup first
-      await invoke('paste_to_cursor')
-
-      console.log('✅ Pasted to cursor:', entry.content.substring(0, 50))
-
-      // Hide the popup window (doesn't return focus to parent)
+      // Hide the popup FIRST, then paste (this ensures target app receives focus)
       const clipboardWindow = getCurrentWindow()
-      clipboardWindow.hide()
+      await clipboardWindow.hide()
+
+      // Small delay to ensure window is fully hidden
+      await new Promise(resolve => setTimeout(resolve, 50))
+
+      // Now paste to cursor
+      if (asPlainText) {
+        await invoke('paste_as_plain_text')
+      } else {
+        await invoke('paste_to_cursor')
+      }
+
+      console.log('✅ Pasted{} to cursor:', asPlainText ? ' as plain text' : '', entry.content.substring(0, 50))
     } catch (error) {
       console.error('Failed to paste to cursor:', error)
       if (showToast) showToast('Failed to paste', 'error')
@@ -458,17 +474,23 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
                 <div
                   key={entry.id}
                   id={`clipboard-entry-${index}`}
-                  className={`p-3 border-b border-border/50 cursor-pointer hover:bg-accent transition-colors ${
-                    index === selectedIndex ? 'bg-accent' : ''
+                  className={`p-3 border-b border-border/50 cursor-pointer hover:bg-accent transition-all ${
+                    index === selectedIndex ? 'bg-accent ring-1 ring-primary/20' : ''
                   }`}
-                  onClick={() => {
-                    copyToClipboard(entry)
+                  onClick={(e) => {
+                    e.preventDefault()
+                    setSelectedIndex(index)
+                    // Use setTimeout to ensure state updates before copy
+                    setTimeout(() => copyToClipboard(entry), 0)
+                  }}
+                  onMouseEnter={() => {
+                    setSelectedIndex(index)
                   }}
                 >
                   <div className="flex justify-between items-start gap-2">
-                    <div className="flex-1 overflow-hidden">
+                    <div className="flex-1 min-w-0 overflow-hidden">
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                        <Clock className="w-3 h-3" />
+                        <Clock className="w-3 h-3 flex-shrink-0" />
                         <span>{getTimeAgo(entry.created_at)}</span>
                         <span>•</span>
                         <span className="capitalize">{entry.category}</span>
@@ -486,19 +508,40 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
                         {entry.content}
                       </div>
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        pasteToClipboard(entry)
-                      }}
-                      onMouseDown={(e) => {
-                        e.stopPropagation()
-                      }}
-                      className="text-primary hover:text-primary hover:bg-primary/10 p-1.5 rounded transition-colors font-medium text-xs"
-                      title="Paste to active cursor"
-                    >
-                      Paste this
-                    </button>
+
+                    {/* Show paste buttons only on selected card */}
+                    {index === selectedIndex && (
+                      <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            pasteToClipboard(entry, false)
+                          }}
+                          onMouseDown={(e) => {
+                            e.stopPropagation()
+                          }}
+                          className="flex items-center gap-1 bg-primary text-primary-foreground hover:bg-primary/90 px-2 py-1 rounded transition-colors font-medium text-[10px] shadow-sm"
+                          title="Paste with formatting (Enter)"
+                        >
+                          <Clipboard className="w-3 h-3" />
+                          <span>Paste</span>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            pasteToClipboard(entry, true)
+                          }}
+                          onMouseDown={(e) => {
+                            e.stopPropagation()
+                          }}
+                          className="flex items-center gap-1 bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground px-2 py-1 rounded transition-colors font-medium text-[10px] shadow-sm border border-border/50"
+                          title="Paste without formatting (Shift+Enter)"
+                        >
+                          <Clipboard className="w-3 h-3" />
+                          <span>Plain</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -521,10 +564,18 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
         </div>
 
         {/* Footer */}
-        <div className="p-2 border-t border-border/50 text-xs text-muted-foreground">
-          <div className="flex items-center justify-between">
-            <span>↑↓ Navigate • Enter to Paste • Esc to Close</span>
-            <span>{copiedEntryId ? 'Copied! Press Esc to close' : 'Click "Paste this" or press Enter'}</span>
+        <div className="p-2 border-t border-border/50 text-[11px] text-muted-foreground bg-muted/30">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-3 text-center">
+            <span className="flex items-center gap-1.5 flex-wrap justify-center">
+              <kbd className="px-1.5 py-0.5 bg-background border border-border rounded text-[10px] font-mono">↑↓</kbd> Navigate
+              <span className="text-border/30">•</span>
+              <kbd className="px-1.5 py-0.5 bg-background border border-border rounded text-[10px] font-mono">Enter</kbd> Paste
+              <span className="text-border/30">•</span>
+              <kbd className="px-1.5 py-0.5 bg-background border border-border rounded text-[10px] font-mono">Shift+Enter</kbd> Plain
+              <span className="text-border/30">•</span>
+              <kbd className="px-1.5 py-0.5 bg-background border border-border rounded text-[10px] font-mono">Esc</kbd> Close
+            </span>
+            {copiedEntryId && <span className="text-green-500">✓ Copied!</span>}
           </div>
         </div>
       </div>

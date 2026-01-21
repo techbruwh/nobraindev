@@ -316,14 +316,24 @@ pub fn show_clipboard_popup(app_handle: tauri::AppHandle) -> Result<(), String> 
             let bundle_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
             println!("🔍 AppleScript captured bundle ID: '{}'", bundle_id);
 
-            // Store the bundle ID if it's not nobraindev and not empty
-            if !bundle_id.contains("nobraindev") && !bundle_id.is_empty() {
+            // Check if bundle ID is valid (not empty and not "missing value")
+            if bundle_id.is_empty() || bundle_id == "missing value" {
+                println!("⚠️  Invalid previous app (empty/missing): '{}'", bundle_id);
+
+                // Clear any previously stored app
+                if let Ok(mut prev_app) = PREVIOUS_APP.lock() {
+                    *prev_app = None;
+                }
+            } else {
+                // Store the bundle ID (including nobraindev - we need to paste back to it!)
                 if let Ok(mut prev_app) = PREVIOUS_APP.lock() {
                     *prev_app = Some(bundle_id.clone());
-                    println!("✅ Captured previous app BEFORE popup opens: {}", bundle_id);
+                    if bundle_id.contains("nobraindev") {
+                        println!("✅ Captured nobraindev as previous app (user wants to paste into nobraindev)");
+                    } else {
+                        println!("✅ Captured previous app BEFORE popup opens: {}", bundle_id);
+                    }
                 }
-            } else if bundle_id.contains("nobraindev") {
-                println!("⚠️  Detected nobraindev, not storing as previous app");
             }
         } else {
             println!("⚠️  Failed to execute AppleScript to capture previous app");
@@ -576,9 +586,35 @@ pub fn capture_previous_app() -> Result<(), String> {
 /// Paste content from clipboard to active cursor position
 #[tauri::command]
 pub fn paste_to_cursor() -> Result<(), String> {
+    paste_internal(false)
+}
+
+/// Paste content as plain text (without formatting)
+#[tauri::command]
+pub fn paste_as_plain_text() -> Result<(), String> {
+    paste_internal(true)
+}
+
+fn paste_internal(as_plain_text: bool) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         use std::process::Command;
+
+        // If pasting as plain text, first convert clipboard to plain text
+        if as_plain_text {
+            println!("🔄 Converting clipboard to plain text...");
+
+            // Read current clipboard content
+            let mut clipboard = arboard::Clipboard::new()
+                .map_err(|e| format!("Failed to access clipboard: {}", e))?;
+
+            if let Ok(text) = clipboard.get_text() {
+                // Write back as plain text (this strips formatting)
+                clipboard.set_text(&text)
+                    .map_err(|e| format!("Failed to set plain text: {}", e))?;
+                println!("✅ Converted to plain text");
+            }
+        }
 
         // Get the stored previous app (bundle ID)
         let previous_app = {
@@ -588,14 +624,15 @@ pub fn paste_to_cursor() -> Result<(), String> {
 
         // If we have a stored previous app, switch to it and paste
         if let Some(bundle_id) = previous_app {
-            println!("🎯 Pasting to previous app: {}", bundle_id);
+            println!("🎯 Pasting{} to previous app: {}", if as_plain_text { " as plain text" } else { "" }, bundle_id);
 
-            // Switch to the previous app using bundle ID and paste in one AppleScript
+            // Switch to the previous app using bundle ID and paste
             let script = format!(
                 r#"
                 tell application id "{}"
                     activate
                 end tell
+                delay 0.1
                 tell application "System Events"
                     keystroke "v" using command down
                 end tell
