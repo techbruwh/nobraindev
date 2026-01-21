@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.8] - 2026-01-21
+
+### 🔧 Chores
+-  update readme
+
+
+
 ## [1.5.7] - 2026-01-21
 
 ### 🐛 Bug Fixes
