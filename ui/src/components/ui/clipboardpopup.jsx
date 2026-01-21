@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search, FilePlus, Clock, FileCode, Check, ChevronDown } from 'lucide-react'
+import { Search, FilePlus, Clock, Check, ChevronDown } from 'lucide-react'
 import { ClipboardService } from '@/lib/clipboard'
 import { Button } from '@/components/ui/button'
 import { listen, emit } from '@tauri-apps/api/event'
@@ -184,13 +184,12 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
         return
       }
 
-      // Enter - copy selected entry and keep popup open
+      // Enter - paste selected entry to active cursor
       if (e.key === 'Enter' && filteredEntries.length > 0) {
         e.preventDefault()
         e.stopPropagation()
         const entry = filteredEntries[selectedIndex]
-        copyToClipboard(entry)
-        // Don't close popup - user must press ESC to close
+        pasteToClipboard(entry)
         return
       }
     }
@@ -292,6 +291,25 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
     } catch (error) {
       console.error('Failed to copy to clipboard:', error)
       if (showToast) showToast('Failed to copy to clipboard', 'error')
+    }
+  }
+
+  async function pasteToClipboard(entry) {
+    try {
+      // First copy to clipboard
+      await navigator.clipboard.writeText(entry.content)
+
+      // Paste to cursor WITHOUT closing popup first
+      await invoke('paste_to_cursor')
+
+      console.log('✅ Pasted to cursor:', entry.content.substring(0, 50))
+
+      // Hide the popup window (doesn't return focus to parent)
+      const clipboardWindow = getCurrentWindow()
+      clipboardWindow.hide()
+    } catch (error) {
+      console.error('Failed to paste to cursor:', error)
+      if (showToast) showToast('Failed to paste', 'error')
     }
   }
 
@@ -471,16 +489,15 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        console.log('📝 Convert button onClick fired, stopping propagation')
-                        handleConvertClick(entry)
+                        pasteToClipboard(entry)
                       }}
                       onMouseDown={(e) => {
                         e.stopPropagation()
                       }}
-                      className="text-muted-foreground hover:text-primary hover:bg-accent p-1.5 rounded transition-colors"
-                      title="Convert to snippet"
+                      className="text-primary hover:text-primary hover:bg-primary/10 p-1.5 rounded transition-colors font-medium text-xs"
+                      title="Paste to active cursor"
                     >
-                      <FileCode className="w-4 h-4" />
+                      Paste this
                     </button>
                   </div>
                 </div>
@@ -506,8 +523,8 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
         {/* Footer */}
         <div className="p-2 border-t border-border/50 text-xs text-muted-foreground">
           <div className="flex items-center justify-between">
-            <span>↑↓ Navigate • Enter to Copy • Esc to Close</span>
-            <span>{copiedEntryId ? 'Copied! Press Esc to close' : 'Click icon to convert to snippet'}</span>
+            <span>↑↓ Navigate • Enter to Paste • Esc to Close</span>
+            <span>{copiedEntryId ? 'Copied! Press Esc to close' : 'Click "Paste this" or press Enter'}</span>
           </div>
         </div>
       </div>

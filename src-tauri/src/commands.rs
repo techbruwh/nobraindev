@@ -4,6 +4,10 @@ use crate::models::{ModelInfo, SearchResult, Snippet};
 use crate::search::{get_models_dir, SearchEngine};
 use crate::search::download_model as download_model_internal;
 use crate::AppState;
+use std::sync::Mutex;
+
+// Global state to store the previous application
+static PREVIOUS_APP: Mutex<Option<String>> = Mutex::new(None);
 
 #[tauri::command]
 pub fn create_snippet(state: State<AppState>, snippet: Snippet) -> Result<i64, String> {
@@ -291,6 +295,41 @@ pub fn show_clipboard_popup(app_handle: tauri::AppHandle) -> Result<(), String> 
 
     println!("📋 Showing clipboard popup window");
 
+    // Capture the previous application BEFORE showing the popup
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+
+        let script = r#"
+        tell application "System Events"
+            set frontApp to first application process whose frontmost is true
+            set bundleId to bundle identifier of frontApp
+            return bundleId
+        end tell
+        "#;
+
+        if let Ok(output) = Command::new("osascript")
+            .arg("-e")
+            .arg(script)
+            .output()
+        {
+            let bundle_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            println!("🔍 AppleScript captured bundle ID: '{}'", bundle_id);
+
+            // Store the bundle ID if it's not nobraindev and not empty
+            if !bundle_id.contains("nobraindev") && !bundle_id.is_empty() {
+                if let Ok(mut prev_app) = PREVIOUS_APP.lock() {
+                    *prev_app = Some(bundle_id.clone());
+                    println!("✅ Captured previous app BEFORE popup opens: {}", bundle_id);
+                }
+            } else if bundle_id.contains("nobraindev") {
+                println!("⚠️  Detected nobraindev, not storing as previous app");
+            }
+        } else {
+            println!("⚠️  Failed to execute AppleScript to capture previous app");
+        }
+    }
+
     // Try to get both the main window and clipboard popup window
     let main_window = app_handle.get_webview_window("main");
     let clipboard_popup = app_handle.get_webview_window("clipboard-popup");
@@ -492,3 +531,136 @@ pub fn register_clipboard_hotkey(app_handle: tauri::AppHandle) -> Result<(), Str
 
     Ok(())
 }
+
+/// Capture the name of the current frontmost application (called before popup opens)
+#[tauri::command]
+pub fn capture_previous_app() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+
+        // Get the current frontmost application
+        let script = r#"
+        tell application "System Events"
+            set frontApp to name of first application process whose frontmost is true
+            return frontApp
+        end tell
+        "#;
+
+        let output = Command::new("osascript")
+            .arg("-e")
+            .arg(script)
+            .output()
+            .map_err(|e| format!("Failed to capture previous app: {}", e))?;
+
+        let app_name = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+        // Store it if it's not nobraindev
+        if !app_name.contains("nobraindev") && !app_name.is_empty() {
+            let mut prev_app = PREVIOUS_APP.lock().map_err(|e| e.to_string())?;
+            *prev_app = Some(app_name.clone());
+            println!("✅ Captured previous app: {}", app_name);
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        // For Windows/Linux, we'll use a simpler approach
+        // Just store None and let the paste logic handle it
+        println!("⚠️  capture_previous_app not fully implemented for this platform");
+    }
+
+    Ok(())
+}
+
+/// Paste content from clipboard to active cursor position
+#[tauri::command]
+pub fn paste_to_cursor() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+
+        // Get the stored previous app (bundle ID)
+        let previous_app = {
+            let prev_app = PREVIOUS_APP.lock().map_err(|e| e.to_string())?;
+            prev_app.clone()
+        };
+
+        // If we have a stored previous app, switch to it and paste
+        if let Some(bundle_id) = previous_app {
+            println!("🎯 Pasting to previous app: {}", bundle_id);
+
+            // Switch to the previous app using bundle ID and paste in one AppleScript
+            let script = format!(
+                r#"
+                tell application id "{}"
+                    activate
+                end tell
+                tell application "System Events"
+                    keystroke "v" using command down
+                end tell
+                "#,
+                bundle_id
+            );
+
+            Command::new("osascript")
+                .arg("-e")
+                .arg(&script)
+                .output()
+                .map_err(|e| format!("Failed to paste: {}", e))?;
+        } else {
+            println!("⚠️  No previous app stored");
+
+            // Fallback: just paste
+            let paste_script = r#"
+            tell application "System Events"
+                keystroke "v" using command down
+            end tell
+            "#;
+
+            Command::new("osascript")
+                .arg("-e")
+                .arg(paste_script)
+                .output()
+                .map_err(|e| format!("Failed to paste: {}", e))?;
+        }
+
+        // Clear the stored app after pasting
+        let mut prev_app = PREVIOUS_APP.lock().map_err(|e| e.to_string())?;
+        *prev_app = None;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        use std::process::Command;
+        use std::thread;
+        use std::time::Duration;
+
+        // Wait for the popup to close
+        thread::sleep(Duration::from_millis(200));
+
+        // For Windows/Linux, use platform-specific paste simulation
+        #[cfg(target_os = "windows")]
+        {
+            // Windows: Use PowerShell to send Ctrl+V
+            Command::new("powershell")
+                .arg("-c")
+                .arg("(New-Object -ComObject WScript.Shell).SendKeys('^{V}')")
+                .output()
+                .map_err(|e| format!("Failed to paste: {}", e))?;
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            // Linux: Use xdotool to send Ctrl+V
+            Command::new("xdotool")
+                .arg("key")
+                .arg("ctrl+v")
+                .output()
+                .map_err(|e| format!("Failed to paste: {}", e))?;
+        }
+    }
+
+    Ok(())
+}
+
