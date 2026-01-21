@@ -398,6 +398,16 @@ export function ClipboardPopup({ isOpen, onClose, showToast, onConvertToSnippet 
         ref={popupRef}
         className="fixed top-0 left-0 right-0 z-50 bg-background border border-border rounded-b-xl shadow-2xl w-full h-full overflow-hidden flex flex-col"
       >
+        {/* Header with Logo */}
+        <div className="flex items-center justify-center px-4 py-2 border-b border-border/50 bg-muted/30">
+          <img
+            src="/icon-192.png"
+            alt="App Icon"
+            className="w-5 h-5 object-contain rounded mr-2"
+          />
+          <span className="text-xs font-semibold">Clipboard History</span>
+        </div>
+
         {/* Search Input */}
         <div className="relative border-b border-border/50">
           <Search className="absolute left-3 h-4 w-4 text-muted-foreground top-1/2 -translate-y-1/2" />

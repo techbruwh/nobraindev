@@ -354,7 +354,11 @@ export function AccountMainView({
             {/* Header */}
             <div className="text-center mb-8">
               <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/10 mb-4">
-                <Sparkles className="h-7 w-7 text-primary" />
+                <img
+                  src="/icon-192.png"
+                  alt="App Icon"
+                  className="w-7 h-7 object-contain rounded"
+                />
               </div>
               <h2 className="text-xl font-bold mb-2">Powerful Features</h2>
               <p className="text-sm text-muted-foreground">
