@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.7] - 2026-01-21
+
+### 🐛 Bug Fixes
+-  clipboard ux improvement
+-  better handle for clipboard manager
+
+### 🔧 Chores
+-  making consistent button across screen
+-  add logo to clipboard popup
+
+
+
 ## [1.5.6] - 2026-01-20
 
 ### 🐛 Bug Fixes
