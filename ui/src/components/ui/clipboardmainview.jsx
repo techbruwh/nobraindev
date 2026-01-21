@@ -490,7 +490,7 @@ export const ClipboardMainView = forwardRef(({ onConvertToSnippet, onClipboardCh
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-7 px-2 text-[9px] text-destructive hover:text-destructive ml-auto"
+                      className="h-7 px-2 text-[9px] text-destructive hover:text-destructive"
                       onClick={(e) => {
                         e.stopPropagation()
                         handleDeleteEntry(entry.id)
@@ -549,32 +549,32 @@ export const ClipboardMainView = forwardRef(({ onConvertToSnippet, onClipboardCh
                   <Clipboard className="h-4 w-4 text-primary" />
                   <h3 className="text-sm font-semibold">Clipboard Entry</h3>
                 </div>
-                <div className="flex gap-1.5">
+                <div className="flex items-center gap-1.5">
                   <Button
+                    variant="ghost"
                     size="sm"
-                    variant="outline"
-                    className="h-8 text-xs"
+                    className="h-7 px-2 text-[10px]"
                     onClick={() => handleCopyEntry(selectedEntry.content)}
                   >
-                    <Copy className="h-3.5 w-3.5 mr-1.5" />
+                    <Copy className="h-3 w-3 mr-1" />
                     Copy
                   </Button>
                   <Button
+                    variant="ghost"
                     size="sm"
-                    variant="outline"
-                    className="h-8 text-xs"
+                    className="h-7 px-2 text-[10px]"
                     onClick={() => handleConvertClick(selectedEntry)}
                   >
-                    <FileCode className="h-3.5 w-3.5 mr-1.5" />
+                    <FileCode className="h-3 w-3 mr-1" />
                     Convert to Snippet
                   </Button>
                   <Button
+                    variant="ghost"
                     size="sm"
-                    variant="destructive"
-                    className="h-8 text-xs"
+                    className="h-7 px-2 text-[10px] text-destructive hover:text-destructive"
                     onClick={() => handleDeleteEntry(selectedEntry.id)}
                   >
-                    <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                    <Trash2 className="h-3 w-3 mr-1" />
                     Delete
                   </Button>
                 </div>
