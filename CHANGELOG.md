@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.9] - 2026-01-21
+
+### 🐛 Bug Fixes
+-  Clipboard popup to skip the activate step when the previous app is NoBrainDev itself, or don't capture NoBrainDev as the previous app at all.
+
+
+
 ## [1.5.8] - 2026-01-21
 
 ### 🔧 Chores
