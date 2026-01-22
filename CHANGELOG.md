@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.1] - 2026-01-22
+
+### 🐛 Bug Fixes
+-  issue on loading uncategorized folder
+
+
+
 ## [2.0.0] - 2026-01-22
 
 ### ✨ Features
