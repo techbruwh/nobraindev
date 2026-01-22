@@ -49,3 +49,19 @@ pub struct ClipboardEntry {
     pub created_at: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct File {
+    pub id: Option<i64>,
+    pub filename: String,
+    pub file_type: String,
+    pub file_size: i64,
+    pub folder_id: Option<i64>,
+    pub storage_path: String,
+    pub cloud_storage_path: Option<String>,
+    pub mime_type: Option<String>,
+    pub description: Option<String>,
+    pub tags: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+

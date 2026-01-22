@@ -1,4 +1,4 @@
-import { FileCode, User, Clipboard, Folder, FolderPlus, FolderOpen, X, Edit2 } from 'lucide-react'
+import { FileCode, FileText, User, Clipboard, Folder, FolderPlus, FolderOpen, X, Edit2 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 
@@ -38,6 +38,7 @@ export function MenuSidebar({
 
   const menuItems = [
     { id: 'snippets', icon: FileCode, label: 'Snippets', badge: null },
+    { id: 'files', icon: FileText, label: 'Files', badge: null },
     { id: 'clipboard', icon: Clipboard, label: 'Clipboard', badge: null },
     { id: 'account', icon: User, label: 'Account', badge: 'DEV' }
   ]
@@ -76,8 +77,8 @@ export function MenuSidebar({
     onUpdateFolder(folderId, folder?.name || '', emoji)
   }
 
-  // Show folders only when snippets menu is active and sidebar is not collapsed
-  const showFolders = activeMenu === 'snippets' && !sidebarCollapsed
+  // Show folders only when snippets or files menu is active and sidebar is not collapsed
+  const showFolders = (activeMenu === 'snippets' || activeMenu === 'files') && !sidebarCollapsed
 
   return (
     <div className={`h-full flex flex-col py-2 gap-1 bg-background relative overflow-hidden border-r transition-all duration-300 ${
@@ -126,14 +127,14 @@ export function MenuSidebar({
         })}
       </div>
 
-      {/* Folders Section - Only show when snippets menu is active */}
+      {/* Folders Section - Only show when snippets or files menu is active */}
       {showFolders && (
         <div className="flex-1 flex flex-col overflow-hidden mt-2 z-10">
           {/* Folders Header */}
           <div className="px-2 py-1.5 border-b border-border/50">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
-                Folders
+                {activeMenu === 'files' ? 'File Folders' : 'Folders'}
               </span>
               <button
                 onClick={() => setShowCreateFolder(!showCreateFolder)}
@@ -161,7 +162,7 @@ export function MenuSidebar({
 
           {/* Folders List */}
           <div className="flex-1 overflow-y-auto px-2 py-1 space-y-0.5">
-            {/* All Snippets */}
+            {/* All Snippets / All Files */}
             <button
               onClick={() => onFolderSelect(null)}
               className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors ${
@@ -171,7 +172,9 @@ export function MenuSidebar({
               }`}
             >
               <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />
-              <span className="text-xs flex-1 text-left">All Snippets</span>
+              <span className="text-xs flex-1 text-left">
+                {activeMenu === 'files' ? 'All Files' : 'All Snippets'}
+              </span>
               <span className={`text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${
                 selectedFolderId === null ? 'bg-purple-500/20' : 'bg-muted'
               }`}>

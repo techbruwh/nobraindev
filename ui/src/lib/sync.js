@@ -691,6 +691,335 @@ export class SyncService {
   }
 
   /**
+   * Upload file to Supabase Storage
+   */
+  async uploadFileToStorage(userEmail, fileData, fileName, mimeType) {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase not configured')
+    }
+
+    try {
+      // Sanitize email for use as folder name (replace @ with _at_)
+      const safeEmail = userEmail.replace(/@/g, '_at_')
+      const filePath = `${safeEmail}/${fileName}`
+
+      const { data, error } = await supabase
+        .storage
+        .from('user-files')
+        .upload(filePath, fileData, {
+          contentType: mimeType || 'application/octet-stream',
+          upsert: true
+        })
+
+      if (error) throw error
+
+      return filePath
+    } catch (error) {
+      console.error('Failed to upload file to storage:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Download file from Supabase Storage
+   */
+  async downloadFileFromStorage(userEmail, cloudPath) {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase not configured')
+    }
+
+    try {
+      const { data, error } = await supabase
+        .storage
+        .from('user-files')
+        .download(cloudPath)
+
+      if (error) throw error
+
+      return data
+    } catch (error) {
+      console.error('Failed to download file from storage:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Delete file from Supabase Storage
+   */
+  async deleteFileFromStorage(userEmail, cloudPath) {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase not configured')
+    }
+
+    try {
+      const { error } = await supabase
+        .storage
+        .from('user-files')
+        .remove([cloudPath])
+
+      if (error) throw error
+
+      return { deleted: true }
+    } catch (error) {
+      console.error('Failed to delete file from storage:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Push local files to Supabase
+   */
+  async pushFilesToCloud(userEmail) {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase not configured')
+    }
+
+    if (!userEmail) {
+      throw new Error('User email required for sync')
+    }
+
+    try {
+      const localFiles = await invoke('get_all_files')
+
+      if (!localFiles || localFiles.length === 0) {
+        console.log('No local files to sync')
+        return { pushed: 0, errors: 0 }
+      }
+
+      let pushed = 0
+      let errors = 0
+
+      for (const file of localFiles) {
+        try {
+          // Get file data from local storage
+          const [fileName, fileData, mimeType] = await invoke('download_file', { id: file.id })
+
+          // Upload to Supabase Storage
+          const cloudPath = await this.uploadFileToStorage(userEmail, fileData, fileName, mimeType)
+
+          // Check if file already exists in database
+          const { data: existing, error: fetchError } = await supabase
+            .from('files')
+            .select('id, updated_at')
+            .eq('user_email', userEmail)
+            .eq('local_id', file.id)
+            .single()
+
+          if (fetchError && fetchError.code !== 'PGRST116') {
+            throw fetchError
+          }
+
+          const cloudFile = {
+            user_email: userEmail,
+            local_id: file.id,
+            filename: file.filename,
+            file_type: file.file_type,
+            file_size: file.file_size,
+            folder_id: file.folder_id,
+            cloud_storage_path: cloudPath,
+            mime_type: file.mime_type,
+            description: file.description,
+            tags: file.tags,
+            created_at: file.created_at,
+            updated_at: file.updated_at
+          }
+
+          if (existing) {
+            const localTime = new Date(file.updated_at).getTime()
+            const cloudTime = new Date(existing.updated_at).getTime()
+
+            if (localTime > cloudTime) {
+              const { error } = await supabase
+                .from('files')
+                .update(cloudFile)
+                .eq('id', existing.id)
+
+              if (error) throw error
+              pushed++
+            }
+          } else {
+            const { error } = await supabase
+              .from('files')
+              .insert(cloudFile)
+
+            if (error) throw error
+            pushed++
+          }
+        } catch (error) {
+          console.error(`Failed to sync file ${file.id}:`, error)
+          errors++
+        }
+      }
+
+      return { pushed, errors }
+    } catch (error) {
+      console.error('Push files to cloud failed:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Pull files from Supabase to local
+   */
+  async pullFilesFromCloud(userEmail) {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase not configured')
+    }
+
+    if (!userEmail) {
+      throw new Error('User email required for sync')
+    }
+
+    try {
+      const { data: cloudFiles, error } = await supabase
+        .from('files')
+        .select('*')
+        .eq('user_email', userEmail)
+
+      if (error) throw error
+
+      if (!cloudFiles || cloudFiles.length === 0) {
+        console.log('No cloud files to sync')
+        return { pulled: 0, errors: 0 }
+      }
+
+      let pulled = 0
+      let errors = 0
+
+      const localFiles = await invoke('get_all_files')
+      const localMap = new Map(localFiles.map(f => [f.id, f]))
+
+      for (const cloudFile of cloudFiles) {
+        try {
+          const localFile = localMap.get(cloudFile.local_id)
+
+          if (!localFile) {
+            // New file from cloud - download file data
+            if (cloudFile.cloud_storage_path) {
+              const fileData = await this.downloadFileFromStorage(userEmail, cloudFile.cloud_storage_path)
+
+              // Create file locally
+              const fileName = cloudFile.filename
+              const fileArrayBuffer = await fileData.arrayBuffer()
+              const fileBytes = new Uint8Array(fileArrayBuffer)
+
+              await invoke('upload_file', {
+                filename: fileName,
+                fileData: Array.from(fileBytes),
+                folderId: cloudFile.folder_id,
+                description: cloudFile.description,
+                tags: cloudFile.tags
+              })
+              pulled++
+            }
+          } else {
+            // Check which is newer
+            const localTime = new Date(localFile.updated_at).getTime()
+            const cloudTime = new Date(cloudFile.updated_at).getTime()
+
+            if (cloudTime > localTime) {
+              // Update metadata (we don't update the actual file content to avoid conflicts)
+              await invoke('update_file', {
+                id: cloudFile.local_id,
+                filename: cloudFile.filename,
+                description: cloudFile.description,
+                tags: cloudFile.tags,
+                folderId: cloudFile.folder_id
+              })
+              pulled++
+            }
+          }
+        } catch (error) {
+          console.error(`Failed to pull file ${cloudFile.id}:`, error)
+          errors++
+        }
+      }
+
+      return { pulled, errors }
+    } catch (error) {
+      console.error('Pull files from cloud failed:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Delete file from cloud by local_id
+   */
+  async deleteFileFromCloud(userEmail, localId) {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase not configured')
+    }
+
+    if (!userEmail) {
+      throw new Error('User email required for deletion')
+    }
+
+    try {
+      // Get file record to get cloud storage path
+      const { data: fileRecord, error: fetchError } = await supabase
+        .from('files')
+        .select('cloud_storage_path')
+        .eq('user_email', userEmail)
+        .eq('local_id', localId)
+        .single()
+
+      if (fetchError) throw fetchError
+
+      // Delete from storage if path exists
+      if (fileRecord?.cloud_storage_path) {
+        await this.deleteFileFromStorage(userEmail, fileRecord.cloud_storage_path)
+      }
+
+      // Delete from database
+      const { error } = await supabase
+        .from('files')
+        .delete()
+        .eq('user_email', userEmail)
+        .eq('local_id', localId)
+
+      if (error) throw error
+
+      return { deleted: true, timestamp: new Date() }
+    } catch (error) {
+      console.error(`Failed to delete file ${localId} from cloud:`, error)
+      throw error
+    }
+  }
+
+  /**
+   * Full two-way sync for files
+   */
+  async syncFilesAll(userEmail) {
+    // Check approval first
+    const approval = await this.checkSyncApproval(userEmail)
+    if (!approval || !approval.approved) {
+      throw new Error('SYNC_NOT_APPROVED')
+    }
+
+    try {
+      console.log('Starting files sync for:', userEmail)
+
+      // First push local changes
+      const pushResult = await this.pushFilesToCloud(userEmail)
+      console.log('Files push result:', pushResult)
+
+      // Then pull cloud changes
+      const pullResult = await this.pullFilesFromCloud(userEmail)
+      console.log('Files pull result:', pullResult)
+
+      return {
+        pushed: pushResult.pushed,
+        pulled: pullResult.pulled,
+        errors: pushResult.errors + pullResult.errors,
+        syncTime: new Date()
+      }
+    } catch (error) {
+      console.error('Files sync failed:', error)
+      throw error
+    }
+  }
+
+  /**
    * Get last sync time
    */
   getLastSyncTime() {

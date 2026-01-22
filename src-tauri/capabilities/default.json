@@ -20,6 +20,8 @@
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister",
     "shell:allow-open",
+    "dialog:allow-open",
+    "dialog:default",
     "updater:default",
     "process:allow-restart"
   ]

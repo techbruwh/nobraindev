@@ -6,6 +6,7 @@ mod models;
 mod commands;
 mod search;
 mod auth;
+mod file_storage;
 
 use std::sync::Mutex;
 
@@ -62,6 +63,12 @@ fn main() {
             commands::paste_to_cursor,
             commands::paste_as_plain_text,
             commands::get_app_version,
+            commands::upload_file,
+            commands::download_file,
+            commands::update_file,
+            commands::delete_file,
+            commands::get_files_by_folder,
+            commands::search_files,
             auth::store_user_token,
             auth::get_user_token,
             auth::clear_user_tokens,

@@ -13,6 +13,8 @@ import { SearchModal } from '@/components/ui/searchmodal'
 import { ConfirmDialog } from '@/components/ui/confirmdialog'
 import { MenuSidebar } from '@/components/ui/menusidebar'
 import { SnippetsPanel } from '@/components/ui/snippetspanel'
+import { FilesPanel } from '@/components/ui/filespanel'
+import { FilePreview } from '@/components/ui/filepreview'
 import { OrganizeModal } from '@/components/ui/organizemodal'
 import { AccountPanel } from '@/components/ui/accountpanel'
 import { AccountMainView } from '@/components/ui/accountmainview'
@@ -98,6 +100,11 @@ function App() {
   // Selected clipboard entry ID
   const [selectedClipboardEntryId, setSelectedClipboardEntryId] = useState(null)
 
+  // File state
+  const [selectedFile, setSelectedFile] = useState(null)
+  const [showFilePreview, setShowFilePreview] = useState(false)
+  const [hasUnsyncedFiles, setHasUnsyncedFiles] = useState(false)
+
   // Folder state
   const [folders, setFolders] = useState([])
   const [selectedFolderId, setSelectedFolderId] = useState(null) // null = all snippets
@@ -159,6 +166,16 @@ function App() {
         }
         result = await syncService.syncClipboardAll(email)
         setHasUnsyncedClipboard(false)
+      } else if (activeMenu === 'files') {
+        // Sync files
+        if (!hasUnsyncedFiles) {
+          showToast('Everything is already synced!', 'success')
+          setLastSyncTime(new Date())
+          setIsFooterSyncing(false)
+          return
+        }
+        result = await syncService.syncFilesAll(email)
+        setHasUnsyncedFiles(false)
       } else if (activeMenu === 'account') {
         // Sync all (account menu syncs everything)
         result = await syncService.syncAll(email)
@@ -1088,10 +1105,44 @@ function App() {
               onViewModeChange={setSnippetsViewMode}
             />
           )}
+          {activeMenu === 'files' && (
+            <FilesPanel
+              currentFolderId={selectedFolderId}
+              currentFolderName={
+                selectedFolderId === 'uncategorized'
+                  ? 'Uncategorized'
+                  : selectedFolderId
+                  ? folders.find(f => f.id === selectedFolderId)?.name
+                  : null
+              }
+              currentFolderIcon={
+                selectedFolderId === 'uncategorized'
+                  ? '📂'
+                  : selectedFolderId
+                  ? folders.find(f => f.id === selectedFolderId)?.icon
+                  : null
+              }
+              onFileSelect={(file) => {
+                setSelectedFile(file)
+                setShowFilePreview(true)
+              }}
+              onUploadComplete={() => setHasUnsyncedFiles(true)}
+              hasUnsyncedChanges={hasUnsyncedFiles}
+              onSyncComplete={(syncTime) => {
+                setHasUnsyncedFiles(false)
+                setLastSyncTime(syncTime)
+              }}
+              onSyncStart={() => {
+                // Optionally handle sync start
+              }}
+              viewMode={snippetsViewMode}
+              onViewModeChange={setSnippetsViewMode}
+            />
+          )}
         </div>
 
         {/* Resize Handle */}
-        {!sidebarCollapsed && activeMenu !== 'clipboard' && activeMenu !== 'account' && (
+        {!sidebarCollapsed && activeMenu !== 'clipboard' && activeMenu !== 'account' && activeMenu !== 'files' && (
           <div
             className="w-1 hover:w-1.5 bg-border hover:bg-primary cursor-col-resize transition-all flex-shrink-0"
             onMouseDown={handleMouseDown}
@@ -1333,7 +1384,8 @@ function App() {
               size="sm"
               className={`h-6 px-2 text-[9px] gap-1 ${
                 ((activeMenu === 'snippets' && hasUnsyncedChanges) ||
-                 (activeMenu === 'clipboard' && hasUnsyncedClipboard))
+                 (activeMenu === 'clipboard' && hasUnsyncedClipboard) ||
+                 (activeMenu === 'files' && hasUnsyncedFiles))
                   ? 'bg-yellow-500/20 text-yellow-600 hover:bg-yellow-500/30 hover:text-yellow-700'
                   : 'bg-muted text-muted-foreground hover:bg-accent'
               }`}
@@ -1349,7 +1401,8 @@ function App() {
                 <>
                   <Cloud className="h-3 w-3" />
                   {((activeMenu === 'snippets' && hasUnsyncedChanges) ||
-                   (activeMenu === 'clipboard' && hasUnsyncedClipboard))
+                   (activeMenu === 'clipboard' && hasUnsyncedClipboard) ||
+                   (activeMenu === 'files' && hasUnsyncedFiles))
                     ? 'Sync Now'
                     : lastSyncTime
                     ? `Synced ${lastSyncTime.toLocaleTimeString()}`
@@ -1462,6 +1515,21 @@ function App() {
         folders={folders}
         onOrganize={handleOrganizeSnippets}
       />
+
+      {/* File Preview Modal */}
+      {showFilePreview && selectedFile && (
+        <FilePreview
+          file={selectedFile}
+          onClose={() => {
+            setShowFilePreview(false)
+            setSelectedFile(null)
+          }}
+          onEdit={(file) => {
+            // Handle file edit if needed
+            setHasUnsyncedFiles(true)
+          }}
+        />
+      )}
 
       {/* Confirmation Dialog */}
       <ConfirmDialog

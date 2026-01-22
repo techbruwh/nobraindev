@@ -3,7 +3,7 @@ use chrono::Utc;
 use rusqlite::{params, Connection, OptionalExtension};
 use std::path::PathBuf;
 
-use crate::models::{Snippet, Folder};
+use crate::models::{Snippet, Folder, File};
 
 const MODEL_VERSION: &str = "all-MiniLM-L6-v2";
 
@@ -169,6 +169,30 @@ impl Database {
         // Create index for clipboard history
         self.conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_clipboard_created ON clipboard_history(created_at DESC)",
+            [],
+        )?;
+
+        // Create files table
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS files (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename TEXT NOT NULL,
+                file_type TEXT NOT NULL,
+                file_size INTEGER NOT NULL,
+                folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL,
+                storage_path TEXT NOT NULL,
+                cloud_storage_path TEXT,
+                mime_type TEXT,
+                description TEXT,
+                tags TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )",
+            [],
+        )?;
+
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_files_folder ON files(folder_id)",
             [],
         )?;
 
@@ -574,12 +598,199 @@ impl Database {
 
     pub fn update_clipboard_entry(&self, id: i64, content: &str, source: &str, category: &str, updated_at: &str) -> Result<()> {
         self.conn.execute(
-            "UPDATE clipboard_history 
+            "UPDATE clipboard_history
              SET content = ?1, source = ?2, category = ?3, created_at = ?4
              WHERE id = ?5",
             params![content, source, category, updated_at, id],
         )?;
 
+        Ok(())
+    }
+
+    // File CRUD methods
+
+    pub fn create_file(&self, file: &File) -> Result<i64> {
+        self.conn.execute(
+            "INSERT INTO files (filename, file_type, file_size, folder_id, storage_path, cloud_storage_path, mime_type, description, tags, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            params![
+                file.filename,
+                file.file_type,
+                file.file_size,
+                file.folder_id,
+                file.storage_path,
+                file.cloud_storage_path,
+                file.mime_type,
+                file.description,
+                file.tags,
+                file.created_at,
+                file.updated_at,
+            ],
+        )?;
+
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    pub fn get_file(&self, id: i64) -> Result<Option<File>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, filename, file_type, file_size, folder_id, storage_path, cloud_storage_path, mime_type, description, tags, created_at, updated_at
+             FROM files WHERE id = ?1"
+        )?;
+
+        let file = stmt.query_row(params![id], |row| {
+            Ok(File {
+                id: Some(row.get(0)?),
+                filename: row.get(1)?,
+                file_type: row.get(2)?,
+                file_size: row.get(3)?,
+                folder_id: row.get(4)?,
+                storage_path: row.get(5)?,
+                cloud_storage_path: row.get(6)?,
+                mime_type: row.get(7)?,
+                description: row.get(8)?,
+                tags: row.get(9)?,
+                created_at: row.get(10)?,
+                updated_at: row.get(11)?,
+            })
+        }).optional()?;
+
+        Ok(file)
+    }
+
+    pub fn get_all_files(&self) -> Result<Vec<File>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, filename, file_type, file_size, folder_id, storage_path, cloud_storage_path, mime_type, description, tags, created_at, updated_at
+             FROM files ORDER BY updated_at DESC"
+        )?;
+
+        let files = stmt.query_map([], |row| {
+            Ok(File {
+                id: Some(row.get(0)?),
+                filename: row.get(1)?,
+                file_type: row.get(2)?,
+                file_size: row.get(3)?,
+                folder_id: row.get(4)?,
+                storage_path: row.get(5)?,
+                cloud_storage_path: row.get(6)?,
+                mime_type: row.get(7)?,
+                description: row.get(8)?,
+                tags: row.get(9)?,
+                created_at: row.get(10)?,
+                updated_at: row.get(11)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(files)
+    }
+
+    pub fn get_files_by_folder(&self, folder_id: Option<i64>) -> Result<Vec<File>> {
+        let sql = if folder_id.is_some() {
+            "SELECT id, filename, file_type, file_size, folder_id, storage_path, cloud_storage_path, mime_type, description, tags, created_at, updated_at
+             FROM files WHERE folder_id = ?1 ORDER BY updated_at DESC"
+        } else {
+            "SELECT id, filename, file_type, file_size, folder_id, storage_path, cloud_storage_path, mime_type, description, tags, created_at, updated_at
+             FROM files WHERE folder_id IS NULL ORDER BY updated_at DESC"
+        };
+
+        let mut stmt = self.conn.prepare(sql)?;
+
+        let file_mapper = |row: &rusqlite::Row| -> std::result::Result<File, rusqlite::Error> {
+            Ok(File {
+                id: Some(row.get(0)?),
+                filename: row.get(1)?,
+                file_type: row.get(2)?,
+                file_size: row.get(3)?,
+                folder_id: row.get(4)?,
+                storage_path: row.get(5)?,
+                cloud_storage_path: row.get(6)?,
+                mime_type: row.get(7)?,
+                description: row.get(8)?,
+                tags: row.get(9)?,
+                created_at: row.get(10)?,
+                updated_at: row.get(11)?,
+            })
+        };
+
+        let files = if let Some(fid) = folder_id {
+            stmt.query_map(params![fid], file_mapper)?
+        } else {
+            stmt.query_map(params![], file_mapper)?
+        }
+        .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(files)
+    }
+
+    pub fn update_file(&self, id: i64, file: &File) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+
+        self.conn.execute(
+            "UPDATE files
+             SET filename = ?1, file_type = ?2, file_size = ?3, folder_id = ?4, storage_path = ?5, cloud_storage_path = ?6, mime_type = ?7, description = ?8, tags = ?9, updated_at = ?10
+             WHERE id = ?11",
+            params![
+                file.filename,
+                file.file_type,
+                file.file_size,
+                file.folder_id,
+                file.storage_path,
+                file.cloud_storage_path,
+                file.mime_type,
+                file.description,
+                file.tags,
+                now,
+                id
+            ],
+        )?;
+
+        Ok(())
+    }
+
+    pub fn delete_file(&self, id: i64) -> Result<()> {
+        self.conn.execute("DELETE FROM files WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    pub fn search_files(&self, query: &str) -> Result<Vec<File>> {
+        let search_pattern = format!("%{}%", query);
+
+        let mut stmt = self.conn.prepare(
+            "SELECT id, filename, file_type, file_size, folder_id, storage_path, cloud_storage_path, mime_type, description, tags, created_at, updated_at
+             FROM files
+             WHERE filename LIKE ?1
+                OR description LIKE ?1
+                OR tags LIKE ?1
+                OR file_type LIKE ?1
+             ORDER BY updated_at DESC"
+        )?;
+
+        let files = stmt.query_map(params![search_pattern], |row| {
+            Ok(File {
+                id: Some(row.get(0)?),
+                filename: row.get(1)?,
+                file_type: row.get(2)?,
+                file_size: row.get(3)?,
+                folder_id: row.get(4)?,
+                storage_path: row.get(5)?,
+                cloud_storage_path: row.get(6)?,
+                mime_type: row.get(7)?,
+                description: row.get(8)?,
+                tags: row.get(9)?,
+                created_at: row.get(10)?,
+                updated_at: row.get(11)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(files)
+    }
+
+    pub fn update_file_cloud_path(&self, id: i64, cloud_path: &str) -> Result<()> {
+        self.conn.execute(
+            "UPDATE files SET cloud_storage_path = ?1 WHERE id = ?2",
+            params![cloud_path, id],
+        )?;
         Ok(())
     }
 }

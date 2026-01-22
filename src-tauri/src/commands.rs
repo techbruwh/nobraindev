@@ -1,8 +1,9 @@
 use tauri::State;
 
-use crate::models::{Folder, ModelInfo, SearchResult, Snippet};
+use crate::models::{Folder, ModelInfo, SearchResult, Snippet, File};
 use crate::search::{get_models_dir, SearchEngine};
 use crate::search::download_model as download_model_internal;
+use crate::file_storage::FileStorageManager;
 use crate::AppState;
 use std::sync::Mutex;
 
@@ -782,4 +783,154 @@ fn paste_internal(as_plain_text: bool) -> Result<(), String> {
 #[tauri::command]
 pub fn get_app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
+}
+
+// File management commands
+
+#[tauri::command]
+pub fn upload_file(
+    state: State<AppState>,
+    filename: String,
+    file_data: Vec<u8>,
+    folder_id: Option<i64>,
+    description: Option<String>,
+    tags: Option<String>,
+) -> Result<i64, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+
+    // Initialize file storage manager
+    let storage_manager = FileStorageManager::new()
+        .map_err(|e| format!("Failed to initialize storage: {}", e))?;
+
+    // Validate file size
+    FileStorageManager::validate_size(file_data.len() as i64)
+        .map_err(|e| e.to_string())?;
+
+    // Save file to local storage
+    let storage_path = storage_manager.save_file(&filename, &file_data)
+        .map_err(|e| format!("Failed to save file: {}", e))?;
+
+    // Detect file type and MIME type
+    let file_type = FileStorageManager::detect_file_type(&filename);
+    let mime_type = FileStorageManager::get_mime_type(&filename);
+
+    // Block executables
+    if file_type == "executable" {
+        // Delete the file we just saved
+        let _ = storage_manager.delete_file(storage_path.to_str().unwrap());
+        return Err("Executable files are not allowed for security reasons".to_string());
+    }
+
+    let now = chrono::Utc::now().to_rfc3339();
+
+    let file = File {
+        id: None,
+        filename,
+        file_type,
+        file_size: file_data.len() as i64,
+        folder_id,
+        storage_path: storage_path.to_string_lossy().to_string(),
+        cloud_storage_path: None,
+        mime_type,
+        description,
+        tags,
+        created_at: now.clone(),
+        updated_at: now,
+    };
+
+    let file_id = db.create_file(&file)
+        .map_err(|e| format!("Failed to create file record: {}", e))?;
+
+    Ok(file_id)
+}
+
+#[tauri::command]
+pub fn download_file(state: State<AppState>, id: i64) -> Result<(String, Vec<u8>, String), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+
+    let file = db.get_file(id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "File not found".to_string())?;
+
+    let storage_manager = FileStorageManager::new()
+        .map_err(|e| format!("Failed to initialize storage: {}", e))?;
+
+    let file_data = storage_manager.read_file(&file.storage_path)
+        .map_err(|e| format!("Failed to read file: {}", e))?;
+
+    let mime_type = file.mime_type.unwrap_or_else(|| "application/octet-stream".to_string());
+
+    Ok((file.filename, file_data, mime_type))
+}
+
+#[tauri::command]
+pub fn update_file(
+    state: State<AppState>,
+    id: i64,
+    filename: Option<String>,
+    description: Option<String>,
+    tags: Option<String>,
+    folder_id: Option<i64>,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+
+    // Get existing file
+    let mut existing_file = db.get_file(id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "File not found".to_string())?;
+
+    // Update fields if provided
+    if let Some(name) = filename {
+        existing_file.filename = name;
+    }
+    if let Some(desc) = description {
+        existing_file.description = Some(desc);
+    }
+    if let Some(tag) = tags {
+        existing_file.tags = Some(tag);
+    }
+    existing_file.folder_id = folder_id;
+
+    db.update_file(id, &existing_file)
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_file(state: State<AppState>, id: i64) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+
+    // Get file record to retrieve storage path
+    let file = db.get_file(id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "File not found".to_string())?;
+
+    // Delete from local storage
+    let storage_manager = FileStorageManager::new()
+        .map_err(|e| format!("Failed to initialize storage: {}", e))?;
+
+    storage_manager.delete_file(&file.storage_path)
+        .map_err(|e| format!("Failed to delete file from storage: {}", e))?;
+
+    // Delete from database
+    db.delete_file(id)
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_files_by_folder(
+    state: State<AppState>,
+    folder_id: Option<i64>,
+) -> Result<Vec<File>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.get_files_by_folder(folder_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn search_files(state: State<AppState>, query: String) -> Result<Vec<File>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.search_files(&query).map_err(|e| e.to_string())
 }
