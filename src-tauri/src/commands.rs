@@ -779,3 +779,7 @@ fn paste_internal(as_plain_text: bool) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+pub fn get_app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}

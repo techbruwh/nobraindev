@@ -515,7 +515,19 @@ function App() {
     setSelectedFolderId(folderId)
 
     try {
-      const data = await invoke('get_snippets_by_folder', { folderId })
+      let data
+
+      if (folderId === null) {
+        // All snippets - use get_all_snippets command
+        data = await invoke('get_all_snippets')
+      } else if (folderId === 'uncategorized') {
+        // Uncategorized - pass null to get_snippets_by_folder (which returns snippets with folder_id IS NULL)
+        data = await invoke('get_snippets_by_folder', { folderId: null })
+      } else {
+        // Specific folder - pass the folder ID
+        data = await invoke('get_snippets_by_folder', { folderId })
+      }
+
       setFilteredSnippets(data)
       setCurrentSnippet(null)
       setTitle('')
@@ -534,7 +546,16 @@ function App() {
 
       // If a folder is currently selected, refresh the view to show updated snippets
       if (selectedFolderId !== null) {
-        const data = await invoke('get_snippets_by_folder', { folderId: selectedFolderId })
+        let data
+
+        if (selectedFolderId === 'uncategorized') {
+          // Uncategorized - pass null to get_snippets_by_folder
+          data = await invoke('get_snippets_by_folder', { folderId: null })
+        } else {
+          // Specific folder - pass the folder ID
+          data = await invoke('get_snippets_by_folder', { folderId: selectedFolderId })
+        }
+
         setFilteredSnippets(data)
       }
 

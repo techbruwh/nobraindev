@@ -1,5 +1,6 @@
 import { FileCode, User, Clipboard, Folder, FolderPlus, FolderOpen, X, Edit2 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 
 // Common emojis for folder icons
 const FOLDER_EMOJIS = [
@@ -26,6 +27,14 @@ export function MenuSidebar({
   const [newFolderName, setNewFolderName] = useState('')
   const [editingFolderId, setEditingFolderId] = useState(null)
   const [editingFolderName, setEditingFolderName] = useState('')
+  const [appVersion, setAppVersion] = useState('')
+
+  // Load app version on mount
+  useEffect(() => {
+    invoke('get_app_version')
+      .then(setAppVersion)
+      .catch(console.error)
+  }, [])
 
   const menuItems = [
     { id: 'snippets', icon: FileCode, label: 'Snippets', badge: null },
@@ -284,7 +293,7 @@ export function MenuSidebar({
 
       {/* Version indicator */}
       <div className="text-[8px] text-muted-foreground/50 z-10 px-2 text-center">
-        v1.5.9
+        {appVersion ? `v${appVersion}` : 'Loading...'}
       </div>
     </div>
   )
