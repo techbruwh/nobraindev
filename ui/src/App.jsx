@@ -104,6 +104,7 @@ function App() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [showFilePreview, setShowFilePreview] = useState(false)
   const [hasUnsyncedFiles, setHasUnsyncedFiles] = useState(false)
+  const [filesReloadCounter, setFilesReloadCounter] = useState(0)
 
   // Folder state
   const [folders, setFolders] = useState([])
@@ -174,7 +175,7 @@ function App() {
           setIsFooterSyncing(false)
           return
         }
-        result = await syncService.syncFilesAll(email)
+        result = await syncService.syncFilesAll(email, user?.id)
         setHasUnsyncedFiles(false)
       } else if (activeMenu === 'account') {
         // Sync all (account menu syncs everything)
@@ -974,6 +975,48 @@ function App() {
     }
   }
 
+  const handleDeleteFile = (file) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete File',
+      message: `Are you sure you want to delete "${file.filename}"? This will be deleted from both local and cloud storage.`,
+      onConfirm: async () => {
+        try {
+          // Delete locally first
+          await invoke('delete_file', { id: file.id })
+
+          // Delete from cloud if user is signed in
+          if (isSignedIn && user?.email) {
+            try {
+              await syncService.deleteFileFromCloud(user.email, user.id, file.id)
+              showToast('File deleted from local and cloud', 'success')
+            } catch (cloudError) {
+              console.warn('Failed to delete from cloud:', cloudError)
+              showToast('Deleted locally (cloud sync failed)', 'warning')
+            }
+          } else {
+            showToast('File deleted locally', 'success')
+          }
+
+          // Mark as having unsynced changes
+          setHasUnsyncedFiles(true)
+
+          // Clear selected file if it was deleted
+          if (selectedFile?.id === file.id) {
+            setSelectedFile(null)
+            setShowFilePreview(false)
+          }
+
+          // Force a reload of files by incrementing a counter
+          setFilesReloadCounter(prev => prev + 1)
+        } catch (error) {
+          console.error('Failed to delete file:', error)
+          showToast('Failed to delete file', 'error')
+        }
+      }
+    })
+  }
+
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
       {/* Search Bar - Below Native Title Bar */}
@@ -1108,6 +1151,7 @@ function App() {
           {activeMenu === 'files' && (
             <FilesPanel
               currentFolderId={selectedFolderId}
+              reloadCounter={filesReloadCounter}
               currentFolderName={
                 selectedFolderId === 'uncategorized'
                   ? 'Uncategorized'
@@ -1135,6 +1179,7 @@ function App() {
               onSyncStart={() => {
                 // Optionally handle sync start
               }}
+              onDeleteFile={handleDeleteFile}
               viewMode={snippetsViewMode}
               onViewModeChange={setSnippetsViewMode}
             />

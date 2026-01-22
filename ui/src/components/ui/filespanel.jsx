@@ -16,6 +16,8 @@ export function FilesPanel({
   hasUnsyncedChanges,
   onSyncComplete,
   onSyncStart,
+  onDeleteFile,
+  reloadCounter,
   viewMode = 'card',
   onViewModeChange
 }) {
@@ -62,9 +64,19 @@ export function FilesPanel({
     try {
       setLoading(true)
       setError(null)
-      // Convert 'uncategorized' string to null for backend
-      const folderId = currentFolderId === 'uncategorized' ? null : currentFolderId
-      const result = await invoke('get_files_by_folder', { folderId })
+
+      let result
+      if (currentFolderId === null) {
+        // "All Files" - get all files from all folders
+        result = await invoke('get_all_files')
+      } else if (currentFolderId === 'uncategorized') {
+        // Uncategorized - get files with no folder
+        result = await invoke('get_files_by_folder', { folderId: null })
+      } else {
+        // Specific folder
+        result = await invoke('get_files_by_folder', { folderId: currentFolderId })
+      }
+
       setFiles(result || [])
     } catch (err) {
       console.error('Failed to load files:', err)
@@ -87,7 +99,7 @@ export function FilesPanel({
   // Load files on mount and folder change
   useEffect(() => {
     loadFiles()
-  }, [currentFolderId])
+  }, [currentFolderId, reloadCounter])
 
   // Check sync approval on mount
   useEffect(() => {
@@ -113,8 +125,16 @@ export function FilesPanel({
         const buffer = await response.arrayBuffer()
         const fileBytes = new Uint8Array(buffer)
 
-        // Convert 'uncategorized' string to null for backend
-        const folderId = currentFolderId === 'uncategorized' ? null : currentFolderId
+        // Determine folder ID for upload
+        // - "All Files" (null) -> upload as uncategorized (null)
+        // - "Uncategorized" ('uncategorized') -> upload as uncategorized (null)
+        // - Specific folder -> use that folder ID
+        let folderId
+        if (currentFolderId === null || currentFolderId === 'uncategorized') {
+          folderId = null
+        } else {
+          folderId = currentFolderId
+        }
 
         // Upload file through Tauri
         await invoke('upload_file', {
@@ -141,16 +161,10 @@ export function FilesPanel({
   }
 
   // Handle file delete
-  const handleDeleteFile = async (e, file) => {
+  const handleDeleteFile = (e, file) => {
     e.stopPropagation()
-
-    try {
-      await invoke('delete_file', { id: file.id })
-      await loadFiles()
-    } catch (err) {
-      console.error('Failed to delete file:', err)
-      setError(err.toString())
-    }
+    // Call parent handler for confirmation dialog
+    onDeleteFile?.(file)
   }
 
   // Handle file download
@@ -220,7 +234,7 @@ export function FilesPanel({
     onSyncStart?.()
 
     try {
-      const result = await syncService.syncFilesAll(email)
+      const result = await syncService.syncFilesAll(email, user?.id)
 
       setSyncStatus({
         type: 'success',
@@ -265,34 +279,19 @@ export function FilesPanel({
     <div className="h-full flex flex-col bg-background">
       {/* Header */}
       <div className="p-3 border-b">
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2">
           <FileText className="h-4 w-4" />
           <h2 className="text-sm font-semibold">
             {currentFolderIcon && <span className="mr-1">{currentFolderIcon}</span>}
             {currentFolderName || 'Files'}
           </h2>
           <Badge variant="secondary" className="text-[9px]">
-            {filteredFiles.length}
+            {files.length}
           </Badge>
-        </div>
 
-        {/* Search Bar */}
-        <div className="relative mb-2">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search files..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-[10px] border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-1">
           {/* View Mode Toggle */}
           {onViewModeChange && (
-            <div className="flex items-center gap-0.5 bg-muted/50 rounded-md p-0.5">
+            <div className="ml-auto flex items-center gap-0.5 bg-muted/50 rounded-md p-0.5">
               <Button
                 variant={viewMode === 'list' ? 'secondary' : 'ghost'}
                 size="sm"
@@ -313,20 +312,6 @@ export function FilesPanel({
               </Button>
             </div>
           )}
-
-          <div className="flex-1"></div>
-
-          {/* Upload Button */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 text-[9px] gap-1"
-            onClick={handleFileUpload}
-            disabled={!!uploadingFile || loading}
-          >
-            <Upload className="h-3 w-3" />
-            {uploadingFile || 'Upload'}
-          </Button>
 
           {/* Sync Button */}
           {isSignedIn && syncApproval?.approved && (
@@ -351,6 +336,18 @@ export function FilesPanel({
               {isSyncing ? 'Syncing...' : hasUnsyncedChanges ? 'Sync' : 'Synced'}
             </Button>
           )}
+        </div>
+
+        {/* Search Bar */}
+        <div className="relative mt-2">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search files..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-8 pr-3 py-1.5 text-[10px] border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+          />
         </div>
       </div>
 

@@ -693,24 +693,37 @@ export class SyncService {
   /**
    * Upload file to Supabase Storage
    */
-  async uploadFileToStorage(userEmail, fileData, fileName, mimeType) {
+  async uploadFileToStorage(userId, fileData, fileName, mimeType) {
     if (!isSupabaseConfigured()) {
       throw new Error('Supabase not configured')
     }
 
     try {
-      console.log('📤 Uploading file to storage:', { userEmail, fileName, mimeType })
+      console.log('📤 Uploading file to storage:', { userId, fileName, mimeType, fileSize: fileData.length })
 
-      // Sanitize email for use as folder name (replace @ with _at_)
-      const safeEmail = userEmail.replace(/@/g, '_at_')
-      const filePath = `${safeEmail}/${fileName}`
+      // Validate file size (Supabase Storage limit is typically 50MB for free tier)
+      const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
+      if (fileData.length > MAX_FILE_SIZE) {
+        throw new Error(`File size ${(fileData.length / 1024 / 1024).toFixed(2)}MB exceeds maximum allowed size of 50MB`)
+      }
+
+      // Use user ID as folder name for better organization
+      const filePath = `${userId}/${fileName}`
 
       console.log('📁 Storage path:', filePath)
+
+      // Ensure fileData is the correct format (Uint8Array or ArrayBuffer)
+      let uploadData = fileData
+      if (fileData instanceof ArrayBuffer) {
+        uploadData = new Uint8Array(fileData)
+      } else if (!Array.isArray(fileData) && !(fileData instanceof Uint8Array)) {
+        throw new Error('Invalid file data format. Expected Uint8Array or ArrayBuffer.')
+      }
 
       const { data, error } = await supabase
         .storage
         .from('user-files')
-        .upload(filePath, fileData, {
+        .upload(filePath, uploadData, {
           contentType: mimeType || 'application/octet-stream',
           upsert: true,
           cacheControl: '3600'
@@ -718,6 +731,14 @@ export class SyncService {
 
       if (error) {
         console.error('❌ Storage upload error:', error)
+        // Provide more helpful error messages
+        if (error.message?.includes('Payload too large')) {
+          throw new Error('File size exceeds Supabase Storage limit (max 50MB)')
+        } else if (error.message?.includes('Bucket not found')) {
+          throw new Error('Storage bucket "user-files" not found. Please create it in Supabase dashboard.')
+        } else if (error.message?.includes('Invalid key')) {
+          throw new Error('Invalid file path or bucket configuration.')
+        }
         throw error
       }
 
@@ -732,7 +753,7 @@ export class SyncService {
   /**
    * Download file from Supabase Storage
    */
-  async downloadFileFromStorage(userEmail, cloudPath) {
+  async downloadFileFromStorage(userId, cloudPath) {
     if (!isSupabaseConfigured()) {
       throw new Error('Supabase not configured')
     }
@@ -761,7 +782,7 @@ export class SyncService {
   /**
    * Delete file from Supabase Storage
    */
-  async deleteFileFromStorage(userEmail, cloudPath) {
+  async deleteFileFromStorage(userId, cloudPath) {
     if (!isSupabaseConfigured()) {
       throw new Error('Supabase not configured')
     }
@@ -790,7 +811,7 @@ export class SyncService {
   /**
    * Push local files to Supabase
    */
-  async pushFilesToCloud(userEmail) {
+  async pushFilesToCloud(userEmail, userId) {
     if (!isSupabaseConfigured()) {
       throw new Error('Supabase not configured')
     }
@@ -822,8 +843,11 @@ export class SyncService {
 
           console.log(`📥 Retrieved file data: ${fileName}, size: ${fileData.length} bytes`)
 
+          // Convert array from Rust to Uint8Array for Supabase
+          const fileDataUint8Array = new Uint8Array(fileData)
+
           // Upload to Supabase Storage
-          const cloudPath = await this.uploadFileToStorage(userEmail, fileData, fileName, mimeType)
+          const cloudPath = await this.uploadFileToStorage(userId, fileDataUint8Array, fileName, mimeType)
 
           // Check if file already exists in database
           const { data: existing, error: fetchError } = await supabase
@@ -897,7 +921,7 @@ export class SyncService {
   /**
    * Pull files from Supabase to local
    */
-  async pullFilesFromCloud(userEmail) {
+  async pullFilesFromCloud(userEmail, userId) {
     if (!isSupabaseConfigured()) {
       throw new Error('Supabase not configured')
     }
@@ -938,7 +962,7 @@ export class SyncService {
             // New file from cloud - download file data
             if (cloudFile.cloud_storage_path) {
               console.log(`📥 Downloading new file from cloud: ${cloudFile.filename}`)
-              const fileData = await this.downloadFileFromStorage(userEmail, cloudFile.cloud_storage_path)
+              const fileData = await this.downloadFileFromStorage(userId, cloudFile.cloud_storage_path)
 
               // Create file locally
               const fileName = cloudFile.filename
@@ -995,7 +1019,7 @@ export class SyncService {
   /**
    * Delete file from cloud by local_id
    */
-  async deleteFileFromCloud(userEmail, localId) {
+  async deleteFileFromCloud(userEmail, userId, localId) {
     if (!isSupabaseConfigured()) {
       throw new Error('Supabase not configured')
     }
@@ -1017,7 +1041,7 @@ export class SyncService {
 
       // Delete from storage if path exists
       if (fileRecord?.cloud_storage_path) {
-        await this.deleteFileFromStorage(userEmail, fileRecord.cloud_storage_path)
+        await this.deleteFileFromStorage(userId, fileRecord.cloud_storage_path)
       }
 
       // Delete from database
@@ -1039,7 +1063,7 @@ export class SyncService {
   /**
    * Full two-way sync for files
    */
-  async syncFilesAll(userEmail) {
+  async syncFilesAll(userEmail, userId) {
     // Check approval first
     const approval = await this.checkSyncApproval(userEmail)
     if (!approval || !approval.approved) {
@@ -1050,11 +1074,11 @@ export class SyncService {
       console.log('Starting files sync for:', userEmail)
 
       // First push local changes
-      const pushResult = await this.pushFilesToCloud(userEmail)
+      const pushResult = await this.pushFilesToCloud(userEmail, userId)
       console.log('Files push result:', pushResult)
 
       // Then pull cloud changes
-      const pullResult = await this.pullFilesFromCloud(userEmail)
+      const pullResult = await this.pullFilesFromCloud(userEmail, userId)
       console.log('Files pull result:', pullResult)
 
       return {
