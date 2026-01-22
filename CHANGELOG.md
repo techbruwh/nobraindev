@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.1] - 2026-01-22
+
+### 🐛 Bug Fixes
+-  fix sync functionality for files
+
+### 🔧 Chores
+-  remove label from snippet list
+
+
+
 ## [2.1.0] - 2026-01-22
 
 ### ✨ Features
