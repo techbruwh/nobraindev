@@ -11,13 +11,29 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Create a single supabase client for interacting with your database
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true
+export const supabase = createClient(
+  supabaseUrl || '',
+  supabaseAnonKey || '',
+  {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true
+    },
+    db: {
+      schema: 'public'
+    },
+    global: {
+      headers: {
+        'X-Client-Info': 'nobraindev'
+      }
+    }
   }
-})
+)
+
+// Storage configuration for custom region
+export const STORAGE_BUCKET = 'user-files'
+export const STORAGE_REGION = 'ap-northeast-1'
 
 // Helper to check if Supabase is configured
 export const isSupabaseConfigured = () => {

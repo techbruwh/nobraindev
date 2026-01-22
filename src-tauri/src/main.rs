@@ -67,6 +67,7 @@ fn main() {
             commands::download_file,
             commands::update_file,
             commands::delete_file,
+            commands::get_all_files,
             commands::get_files_by_folder,
             commands::search_files,
             auth::store_user_token,

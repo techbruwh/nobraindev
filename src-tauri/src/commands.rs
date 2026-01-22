@@ -921,6 +921,12 @@ pub fn delete_file(state: State<AppState>, id: i64) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn get_all_files(state: State<AppState>) -> Result<Vec<File>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.get_all_files().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn get_files_by_folder(
     state: State<AppState>,
     folder_id: Option<i64>,

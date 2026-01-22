@@ -699,24 +699,33 @@ export class SyncService {
     }
 
     try {
+      console.log('📤 Uploading file to storage:', { userEmail, fileName, mimeType })
+
       // Sanitize email for use as folder name (replace @ with _at_)
       const safeEmail = userEmail.replace(/@/g, '_at_')
       const filePath = `${safeEmail}/${fileName}`
+
+      console.log('📁 Storage path:', filePath)
 
       const { data, error } = await supabase
         .storage
         .from('user-files')
         .upload(filePath, fileData, {
           contentType: mimeType || 'application/octet-stream',
-          upsert: true
+          upsert: true,
+          cacheControl: '3600'
         })
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Storage upload error:', error)
+        throw error
+      }
 
+      console.log('✅ File uploaded successfully:', filePath)
       return filePath
     } catch (error) {
-      console.error('Failed to upload file to storage:', error)
-      throw error
+      console.error('❌ Failed to upload file to storage:', error)
+      throw new Error(`Failed to upload file: ${error.message}`)
     }
   }
 
@@ -729,17 +738,23 @@ export class SyncService {
     }
 
     try {
+      console.log('📥 Downloading file from storage:', cloudPath)
+
       const { data, error } = await supabase
         .storage
         .from('user-files')
         .download(cloudPath)
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Storage download error:', error)
+        throw error
+      }
 
+      console.log('✅ File downloaded successfully:', cloudPath)
       return data
     } catch (error) {
-      console.error('Failed to download file from storage:', error)
-      throw error
+      console.error('❌ Failed to download file from storage:', error)
+      throw new Error(`Failed to download file: ${error.message}`)
     }
   }
 
@@ -752,17 +767,23 @@ export class SyncService {
     }
 
     try {
+      console.log('🗑️  Deleting file from storage:', cloudPath)
+
       const { error } = await supabase
         .storage
         .from('user-files')
         .remove([cloudPath])
 
-      if (error) throw error
+      if (error) {
+        console.error('❌ Storage delete error:', error)
+        throw error
+      }
 
+      console.log('✅ File deleted successfully:', cloudPath)
       return { deleted: true }
     } catch (error) {
-      console.error('Failed to delete file from storage:', error)
-      throw error
+      console.error('❌ Failed to delete file from storage:', error)
+      throw new Error(`Failed to delete file: ${error.message}`)
     }
   }
 
@@ -779,20 +800,27 @@ export class SyncService {
     }
 
     try {
+      console.log('📤 Getting local files...')
       const localFiles = await invoke('get_all_files')
 
       if (!localFiles || localFiles.length === 0) {
-        console.log('No local files to sync')
+        console.log('✅ No local files to sync')
         return { pushed: 0, errors: 0 }
       }
+
+      console.log(`📦 Found ${localFiles.length} local files to sync`)
 
       let pushed = 0
       let errors = 0
 
       for (const file of localFiles) {
         try {
+          console.log(`📄 Processing file: ${file.filename} (ID: ${file.id})`)
+
           // Get file data from local storage
           const [fileName, fileData, mimeType] = await invoke('download_file', { id: file.id })
+
+          console.log(`📥 Retrieved file data: ${fileName}, size: ${fileData.length} bytes`)
 
           // Upload to Supabase Storage
           const cloudPath = await this.uploadFileToStorage(userEmail, fileData, fileName, mimeType)
@@ -800,7 +828,7 @@ export class SyncService {
           // Check if file already exists in database
           const { data: existing, error: fetchError } = await supabase
             .from('files')
-            .select('id, updated_at')
+            .select('id, updated_at, cloud_storage_path')
             .eq('user_email', userEmail)
             .eq('local_id', file.id)
             .single()
@@ -825,10 +853,12 @@ export class SyncService {
           }
 
           if (existing) {
+            console.log(`🔄 File exists in cloud, checking if update needed...`)
             const localTime = new Date(file.updated_at).getTime()
             const cloudTime = new Date(existing.updated_at).getTime()
 
             if (localTime > cloudTime) {
+              console.log(`⬆️  Updating file in cloud: ${file.filename}`)
               const { error } = await supabase
                 .from('files')
                 .update(cloudFile)
@@ -836,24 +866,30 @@ export class SyncService {
 
               if (error) throw error
               pushed++
+              console.log(`✅ File updated: ${file.filename}`)
+            } else {
+              console.log(`⏭️  Skipping ${file.filename} (cloud is newer or same)`)
             }
           } else {
+            console.log(`➕ Inserting new file to cloud: ${file.filename}`)
             const { error } = await supabase
               .from('files')
               .insert(cloudFile)
 
             if (error) throw error
             pushed++
+            console.log(`✅ File inserted: ${file.filename}`)
           }
         } catch (error) {
-          console.error(`Failed to sync file ${file.id}:`, error)
+          console.error(`❌ Failed to sync file ${file.id} (${file.filename}):`, error)
           errors++
         }
       }
 
+      console.log(`📊 Push files complete: ${pushed} pushed, ${errors} errors`)
       return { pushed, errors }
     } catch (error) {
-      console.error('Push files to cloud failed:', error)
+      console.error('❌ Push files to cloud failed:', error)
       throw error
     }
   }
@@ -871,6 +907,7 @@ export class SyncService {
     }
 
     try {
+      console.log('📥 Getting cloud files...')
       const { data: cloudFiles, error } = await supabase
         .from('files')
         .select('*')
@@ -879,9 +916,11 @@ export class SyncService {
       if (error) throw error
 
       if (!cloudFiles || cloudFiles.length === 0) {
-        console.log('No cloud files to sync')
+        console.log('✅ No cloud files to sync')
         return { pulled: 0, errors: 0 }
       }
+
+      console.log(`📦 Found ${cloudFiles.length} cloud files to sync`)
 
       let pulled = 0
       let errors = 0
@@ -891,11 +930,14 @@ export class SyncService {
 
       for (const cloudFile of cloudFiles) {
         try {
+          console.log(`📄 Processing cloud file: ${cloudFile.filename} (local_id: ${cloudFile.local_id})`)
+
           const localFile = localMap.get(cloudFile.local_id)
 
           if (!localFile) {
             // New file from cloud - download file data
             if (cloudFile.cloud_storage_path) {
+              console.log(`📥 Downloading new file from cloud: ${cloudFile.filename}`)
               const fileData = await this.downloadFileFromStorage(userEmail, cloudFile.cloud_storage_path)
 
               // Create file locally
@@ -911,6 +953,9 @@ export class SyncService {
                 tags: cloudFile.tags
               })
               pulled++
+              console.log(`✅ Downloaded and created: ${cloudFile.filename}`)
+            } else {
+              console.log(`⚠️  Skipping ${cloudFile.filename} (no cloud storage path)`)
             }
           } else {
             // Check which is newer
@@ -918,6 +963,7 @@ export class SyncService {
             const cloudTime = new Date(cloudFile.updated_at).getTime()
 
             if (cloudTime > localTime) {
+              console.log(`🔄 Updating metadata for: ${cloudFile.filename}`)
               // Update metadata (we don't update the actual file content to avoid conflicts)
               await invoke('update_file', {
                 id: cloudFile.local_id,
@@ -927,17 +973,21 @@ export class SyncService {
                 folderId: cloudFile.folder_id
               })
               pulled++
+              console.log(`✅ Updated metadata: ${cloudFile.filename}`)
+            } else {
+              console.log(`⏭️  Skipping ${cloudFile.filename} (local is newer or same)`)
             }
           }
         } catch (error) {
-          console.error(`Failed to pull file ${cloudFile.id}:`, error)
+          console.error(`❌ Failed to pull file ${cloudFile.id} (${cloudFile.filename}):`, error)
           errors++
         }
       }
 
+      console.log(`📊 Pull files complete: ${pulled} pulled, ${errors} errors`)
       return { pulled, errors }
     } catch (error) {
-      console.error('Pull files from cloud failed:', error)
+      console.error('❌ Pull files from cloud failed:', error)
       throw error
     }
   }
