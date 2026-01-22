@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.0] - 2026-01-22
+
+### ✨ Features
+-  ability to hide secret information in editor
+-  add folder management
+
+### 🐛 Bug Fixes
+-  fix sync functionality in footer
+
+
+
 ## [1.5.9] - 2026-01-21
 
 ### 🐛 Bug Fixes
