@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.2] - 2026-01-22
+
+### ✨ Features
+-  better ux for listing snippets
+-  better ux for folder organizer
+
+
+
 ## [2.0.1] - 2026-01-22
 
 ### 🐛 Bug Fixes
