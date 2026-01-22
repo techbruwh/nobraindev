@@ -114,6 +114,82 @@ function App() {
   const [availableUpdate, setAvailableUpdate] = useState(null)
   const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false)
 
+  // Footer sync state
+  const [isFooterSyncing, setIsFooterSyncing] = useState(false)
+  const [syncApproval, setSyncApproval] = useState(null)
+
+  // Check sync approval when user signs in
+  useEffect(() => {
+    if (isSignedIn && user?.email) {
+      syncService.checkSyncApproval(user.email)
+        .then(setSyncApproval)
+        .catch(console.error)
+    }
+  }, [isSignedIn, user])
+
+  const handleFooterSync = async () => {
+    const email = user?.email
+    if (!email || !isSignedIn) {
+      showToast('Please sign in to sync', 'error')
+      return
+    }
+
+    setIsFooterSyncing(true)
+
+    try {
+      let result
+      if (activeMenu === 'snippets') {
+        // Sync snippets
+        if (!hasUnsyncedChanges) {
+          showToast('Everything is already synced!', 'success')
+          setLastSyncTime(new Date())
+          setIsFooterSyncing(false)
+          return
+        }
+        result = await syncService.syncAll(email)
+        setHasUnsyncedChanges(false)
+      } else if (activeMenu === 'clipboard') {
+        // Sync clipboard
+        if (!hasUnsyncedClipboard) {
+          showToast('Everything is already synced!', 'success')
+          setLastSyncTime(new Date())
+          setIsFooterSyncing(false)
+          return
+        }
+        result = await syncService.syncClipboardAll(email)
+        setHasUnsyncedClipboard(false)
+      } else if (activeMenu === 'account') {
+        // Sync all (account menu syncs everything)
+        result = await syncService.syncAll(email)
+        setHasUnsyncedChanges(false)
+      }
+
+      setLastSyncTime(result?.syncTime || new Date())
+      showToast('Sync completed successfully', 'success')
+
+      // Reload data after sync
+      if (activeMenu === 'snippets') {
+        await loadSnippets()
+        await loadFolders()
+      }
+    } catch (error) {
+      console.error('Footer sync failed:', error)
+      let errorMessage = 'Sync failed. Please try again.'
+      if (error.message === 'SYNC_NOT_APPROVED') {
+        errorMessage = 'Sync access not approved yet. Please wait for approval.'
+      } else if (error.message === 'Supabase not configured') {
+        errorMessage = 'Cloud sync not configured'
+      } else if (error.message.includes('fetch') || error.message.includes('network')) {
+        errorMessage = 'Network error. Check your internet connection.'
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      showToast(errorMessage, 'error')
+    } finally {
+      setIsFooterSyncing(false)
+    }
+  }
+
   // Detect OS
   useEffect(() => {
     setIsMac(navigator.platform.toUpperCase().indexOf('MAC') >= 0)
@@ -1148,16 +1224,16 @@ function App() {
       <div className="border-t bg-background px-4 py-1.5 flex items-center justify-between">
         <p className="text-[10px] text-muted-foreground flex items-center gap-1">
           made with <span className="text-red-500">♥</span> by{' '}
-          <a 
-            href="https://techbruwh.com" 
-            target="_blank" 
+          <a
+            href="https://techbruwh.com"
+            target="_blank"
             rel="noopener noreferrer"
             className="font-medium hover:text-primary transition-colors"
           >
             techbruwh
           </a>
         </p>
-        
+
         <div className="flex items-center gap-2">
           {availableUpdate && (
             <Button
@@ -1171,14 +1247,52 @@ function App() {
               {isDownloadingUpdate ? 'Installing...' : `Update to v${availableUpdate.version}`}
             </Button>
           )}
-          <span className="text-[9px] text-muted-foreground flex items-center gap-1">
-            <Cloud className="h-3 w-3" />
-            {lastSyncTime ? (
-              <>Last synced: {lastSyncTime.toLocaleTimeString()}</>
-            ) : (
-              <>Not synced yet</>
-            )}
-          </span>
+
+          {/* Sync Button - Only show when signed in and approved */}
+          {isSignedIn && syncApproval?.approved && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`h-6 px-2 text-[9px] gap-1 ${
+                ((activeMenu === 'snippets' && hasUnsyncedChanges) ||
+                 (activeMenu === 'clipboard' && hasUnsyncedClipboard))
+                  ? 'bg-yellow-500/20 text-yellow-600 hover:bg-yellow-500/30 hover:text-yellow-700'
+                  : 'bg-muted text-muted-foreground hover:bg-accent'
+              }`}
+              onClick={handleFooterSync}
+              disabled={isFooterSyncing}
+            >
+              {isFooterSyncing ? (
+                <>
+                  <RefreshCw className="h-3 w-3 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <Cloud className="h-3 w-3" />
+                  {((activeMenu === 'snippets' && hasUnsyncedChanges) ||
+                   (activeMenu === 'clipboard' && hasUnsyncedClipboard))
+                    ? 'Sync Now'
+                    : lastSyncTime
+                    ? `Synced ${lastSyncTime.toLocaleTimeString()}`
+                    : 'Sync'
+                  }
+                </>
+              )}
+            </Button>
+          )}
+
+          {/* Show sync status for non-signed-in users */}
+          {!isSignedIn && (
+            <span className="text-[9px] text-muted-foreground flex items-center gap-1">
+              <Cloud className="h-3 w-3" />
+              {lastSyncTime ? (
+                <>Last synced: {lastSyncTime.toLocaleTimeString()}</>
+              ) : (
+                <>Sign in to sync</>
+              )}
+            </span>
+          )}
         </div>
       </div>
 
