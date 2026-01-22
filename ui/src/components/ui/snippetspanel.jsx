@@ -283,11 +283,6 @@ export function SnippetsPanel({
                             NEW
                           </Badge>
                         )}
-                        {snippet.language && (
-                          <Badge variant="secondary" className="text-[7px]">
-                            {snippet.language}
-                          </Badge>
-                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
@@ -333,11 +328,6 @@ export function SnippetsPanel({
                           <p className="text-[11px] text-muted-foreground">
                             {new Date(snippet.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                           </p>
-                          {snippet.language && (
-                            <Badge variant="secondary" className="text-[8px]">
-                              {snippet.language}
-                            </Badge>
-                          )}
                         </div>
                         {snippet.content && (
                           <p className="text-[11px] text-muted-foreground line-clamp-2 font-mono leading-relaxed">
