@@ -4,7 +4,7 @@ import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { listen } from '@tauri-apps/api/event'
 import { open } from '@tauri-apps/plugin-shell'
-import { Plus, Search, FileCode, X, Edit, Trash2, Copy, Save, Brain, Download, Sparkles, CheckCircle, AlertCircle, Info, PanelLeftClose, PanelLeft, Keyboard, Code, Braces, RefreshCw, Cloud, User } from 'lucide-react'
+import { Plus, Search, FileCode, X, Edit, Trash2, Copy, Save, Brain, Download, Sparkles, CheckCircle, AlertCircle, Info, PanelLeftClose, PanelLeft, Keyboard, Code, Braces, RefreshCw, Cloud, User, List, LayoutList } from 'lucide-react'
 import { useSupabaseAuth } from '@/lib/supabase-auth'
 import { syncService } from '@/lib/sync'
 import { Button } from '@/components/ui/button'
@@ -47,6 +47,7 @@ function App() {
   const [sidebarWidth, setSidebarWidth] = useState(320)
   const [isResizing, setIsResizing] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [snippetsViewMode, setSnippetsViewMode] = useState('card') // 'card' or 'list'
   
   // Form state
   const [isEditing, setIsEditing] = useState(false)
@@ -1083,6 +1084,8 @@ function App() {
               currentFolderId={selectedFolderId}
               currentFolderName={selectedFolderId ? folders.find(f => f.id === selectedFolderId)?.name : null}
               currentFolderIcon={selectedFolderId ? folders.find(f => f.id === selectedFolderId)?.icon : null}
+              viewMode={snippetsViewMode}
+              onViewModeChange={setSnippetsViewMode}
             />
           )}
         </div>

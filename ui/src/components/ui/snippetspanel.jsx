@@ -1,4 +1,4 @@
-import { Search, Plus, FileCode, Trash2, Copy, AlertCircle, RefreshCw, Cloud, CheckCircle, Loader2, ArrowUp, Shield, Clock } from 'lucide-react'
+import { Search, Plus, FileCode, Trash2, Copy, AlertCircle, RefreshCw, Cloud, CheckCircle, Loader2, ArrowUp, Shield, Clock, List, LayoutList } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useEffect, useRef, useState } from 'react'
@@ -20,7 +20,9 @@ export function SnippetsPanel({
   newSnippetIds = new Set(),
   currentFolderId,
   currentFolderName,
-  currentFolderIcon
+  currentFolderIcon,
+  viewMode = 'card',
+  onViewModeChange
 }) {
   const { user } = useSupabaseAuth()
   const isSignedIn = !!user
@@ -153,14 +155,38 @@ export function SnippetsPanel({
             {snippets.length}
           </Badge>
 
+          {/* View Mode Toggle */}
+          {onViewModeChange && (
+            <div className="ml-auto flex items-center gap-0.5 bg-muted/50 rounded-md p-0.5">
+              <Button
+                variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-6 w-6 p-0"
+                onClick={() => onViewModeChange('list')}
+                title="List view"
+              >
+                <List className="h-3 w-3" />
+              </Button>
+              <Button
+                variant={viewMode === 'card' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-6 w-6 p-0"
+                onClick={() => onViewModeChange('card')}
+                title="Card view"
+              >
+                <LayoutList className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
+
           {/* Sync Button */}
           {isSignedIn && syncApproval?.approved && (
             <Button
               variant="ghost"
               size="sm"
-              className={`ml-auto h-7 px-2 text-[9px] gap-1 ${
-                hasUnsyncedChanges && !isSyncing 
-                  ? 'bg-yellow-500/20 text-yellow-600 hover:bg-yellow-500/30 hover:text-yellow-700' 
+              className={`h-7 px-2 text-[9px] gap-1 ${
+                hasUnsyncedChanges && !isSyncing
+                  ? 'bg-yellow-500/20 text-yellow-600 hover:bg-yellow-500/30 hover:text-yellow-700'
                   : ''
               }`}
               disabled={!hasUnsyncedChanges || isSyncing}
@@ -180,12 +206,12 @@ export function SnippetsPanel({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+      <div className={`flex-1 overflow-y-auto ${viewMode === 'list' ? '' : 'p-3 space-y-2'}`}>
         {/* Sync Status */}
         {syncStatus && (
-          <div className={`p-2 rounded-md border ${
-            syncStatus.type === 'success' 
-              ? 'bg-green-500/10 border-green-500/20' 
+          <div className={`mx-3 mt-3 p-2 rounded-md border ${
+            syncStatus.type === 'success'
+              ? 'bg-green-500/10 border-green-500/20'
               : 'bg-destructive/10 border-destructive/20'
           }`}>
             <div className="flex items-center gap-2">
@@ -204,7 +230,7 @@ export function SnippetsPanel({
         )}
 
         {error && (
-          <div className="p-2 bg-destructive/10 border border-destructive/20 rounded-md">
+          <div className="m-3 p-2 bg-destructive/10 border border-destructive/20 rounded-md">
             <div className="flex items-start gap-2">
               <AlertCircle className="h-3 w-3 text-destructive mt-0.5" />
               <p className="text-[10px] text-destructive">{error}</p>
@@ -217,7 +243,7 @@ export function SnippetsPanel({
             <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
           </div>
         ) : snippets.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
+          <div className={`text-center py-8 text-muted-foreground ${viewMode === 'list' ? 'px-3' : ''}`}>
             <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
             <p className="text-[10px]">No snippets yet</p>
           </div>
@@ -228,63 +254,121 @@ export function SnippetsPanel({
                 key={snippet.id}
                 ref={(el) => snippetRefs.current[snippet.id] = el}
                 onClick={() => onSnippetClick(snippet)}
-                className={`p-2.5 border rounded-lg cursor-pointer transition-all ${
-                  currentSnippet?.id === snippet.id
-                    ? 'bg-accent border-primary/50 ring-1 ring-primary/20 shadow-sm'
-                    : 'bg-accent/30 border-border/50 hover:bg-accent/50 hover:border-border hover:shadow-sm'
-                }`}
+                className={`
+                  cursor-pointer transition-all
+                  ${viewMode === 'list'
+                    ? `px-2 py-1.5 border-b border-border/50 hover:bg-accent/50 ${
+                        currentSnippet?.id === snippet.id
+                          ? 'bg-accent border-primary/50'
+                          : ''
+                      }`
+                    : `p-2.5 border rounded-lg ${
+                        currentSnippet?.id === snippet.id
+                          ? 'bg-accent border-primary/50 ring-1 ring-primary/20 shadow-sm'
+                          : 'bg-accent/30 border-border/50 hover:bg-accent/50 hover:border-border hover:shadow-sm'
+                      }`
+                  }
+                `}
               >
-                <div className="flex items-start gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-[11px] font-medium truncate">
-                        {snippet.title}
-                      </h3>
-                      {newSnippetIds.has(snippet.id) && (
-                        <Badge className="text-[8px] px-1.5 py-0 bg-green-500 text-white hover:bg-green-600">
-                          NEW
-                        </Badge>
-                      )}
+                {viewMode === 'list' ? (
+                  // List View - Compact single line
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-[10px] font-medium truncate">
+                          {snippet.title}
+                        </h3>
+                        {newSnippetIds.has(snippet.id) && (
+                          <Badge className="text-[7px] px-1 py-0 bg-green-500 text-white hover:bg-green-600">
+                            NEW
+                          </Badge>
+                        )}
+                        {snippet.language && (
+                          <Badge variant="secondary" className="text-[7px]">
+                            {snippet.language}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <Clock className="h-3 w-3 text-muted-foreground" />
-                      <p className="text-[11px] text-muted-foreground">
-                        {new Date(snippet.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                      {snippet.language && (
-                        <Badge variant="secondary" className="text-[8px]">
-                          {snippet.language}
-                        </Badge>
-                      )}
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <span className="text-[9px] text-muted-foreground">
+                        {new Date(snippet.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-5 w-5 p-0"
+                        onClick={(e) => handleCopySnippet(e, snippet.content)}
+                      >
+                        <Copy className="h-2.5 w-2.5" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-5 w-5 p-0 text-destructive hover:text-destructive"
+                        onClick={(e) => handleDeleteClick(e, snippet)}
+                        disabled={deletingId === snippet.id || isDeleting}
+                      >
+                        <Trash2 className="h-2.5 w-2.5" />
+                      </Button>
                     </div>
-                    {snippet.content && (
-                      <p className="text-[11px] text-muted-foreground line-clamp-2 font-mono leading-relaxed">
-                        {snippet.content.replace(/<[^>]*>/g, '').substring(0, 100)}
-                      </p>
-                    )}
                   </div>
-                </div>
+                ) : (
+                  // Card View - Full details (existing view)
+                  <>
+                    <div className="flex items-start gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-[11px] font-medium truncate">
+                            {snippet.title}
+                          </h3>
+                          {newSnippetIds.has(snippet.id) && (
+                            <Badge className="text-[8px] px-1.5 py-0 bg-green-500 text-white hover:bg-green-600">
+                              NEW
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Clock className="h-3 w-3 text-muted-foreground" />
+                          <p className="text-[11px] text-muted-foreground">
+                            {new Date(snippet.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                          {snippet.language && (
+                            <Badge variant="secondary" className="text-[8px]">
+                              {snippet.language}
+                            </Badge>
+                          )}
+                        </div>
+                        {snippet.content && (
+                          <p className="text-[11px] text-muted-foreground line-clamp-2 font-mono leading-relaxed">
+                            {snippet.content.replace(/<[^>]*>/g, '').substring(0, 100)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
 
-                {/* Actions */}
-                <div className="flex gap-1 mt-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 px-2 text-[9px]"
-                    onClick={(e) => handleCopySnippet(e, snippet.content)}
-                  >
-                    <Copy className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 px-2 text-[9px] text-destructive hover:text-destructive"
-                    onClick={(e) => handleDeleteClick(e, snippet)}
-                    disabled={deletingId === snippet.id || isDeleting}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
+                    {/* Actions */}
+                    <div className="flex gap-1 mt-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-[9px]"
+                        onClick={(e) => handleCopySnippet(e, snippet.content)}
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-[9px] text-destructive hover:text-destructive"
+                        onClick={(e) => handleDeleteClick(e, snippet)}
+                        disabled={deletingId === snippet.id || isDeleting}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
 
@@ -292,7 +376,7 @@ export function SnippetsPanel({
             {snippets.length > displayCount && (
               <Button
                 variant="ghost"
-                className="w-full text-xs h-8 mt-2"
+                className={`w-full text-xs h-8 ${viewMode === 'list' ? 'rounded-none' : 'mt-2'}`}
                 onClick={() => setDisplayCount(prev => prev + 20)}
               >
                 Load {Math.min(20, snippets.length - displayCount)} More
@@ -303,7 +387,7 @@ export function SnippetsPanel({
       </div>
 
       {/* Footer Actions */}
-      <div className="p-3 border-t">
+      <div className={`border-t ${viewMode === 'list' ? 'p-2' : 'p-3'}`}>
         <Button
           className="w-full text-[10px] h-8"
           onClick={onNewSnippet}
