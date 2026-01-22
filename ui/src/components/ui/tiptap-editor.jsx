@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useEditor, EditorContent, ReactNodeViewRenderer } from '@tiptap/react'
-import { Extension } from '@tiptap/core'
+import { Extension, Mark } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import { open } from '@tauri-apps/plugin-shell'
 import * as UnderlineExt from '@tiptap/extension-underline'
@@ -19,6 +19,51 @@ import * as TaskListExt from '@tiptap/extension-task-list'
 import * as TaskItemExt from '@tiptap/extension-task-item'
 import * as CodeBlockLowlightExt from '@tiptap/extension-code-block-lowlight'
 import { common, createLowlight } from 'lowlight'
+
+// Custom Sensitive extension for hiding passwords and sensitive data
+const Sensitive = Mark.create({
+  name: 'sensitive',
+
+  addAttributes() {
+    return {
+      'data-sensitive': {
+        default: true,
+        parseHTML: element => element.getAttribute('data-sensitive'),
+        renderHTML: attributes => {
+          return {
+            'data-sensitive': attributes['data-sensitive'],
+          }
+        },
+      },
+    }
+  },
+
+  parseHTML() {
+    return [
+      {
+        tag: 'span[data-sensitive]',
+      },
+    ]
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ['span', HTMLAttributes, 0]
+  },
+
+  addCommands() {
+    return {
+      setSensitive: () => ({ commands }) => {
+        return commands.setMark(this.name)
+      },
+      unsetSensitive: () => ({ commands }) => {
+        return commands.unsetMark(this.name)
+      },
+      toggleSensitive: () => ({ commands }) => {
+        return commands.toggleMark(this.name)
+      },
+    }
+  },
+})
 
 const Underline = UnderlineExt.default || UnderlineExt.Underline || UnderlineExt
 const TextStyle = TextStyleExt.default || TextStyleExt.TextStyle || TextStyleExt
@@ -165,7 +210,10 @@ import {
   Plus,
   MinusIcon,
   Columns,
-  Rows
+  Rows,
+  Eye,
+  EyeOff,
+  ShieldAlert
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -222,6 +270,7 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
   const [bubbleMenuPosition, setBubbleMenuPosition] = useState({ top: 0, left: 0 })
   const [showTableMenu, setShowTableMenu] = useState(false)
   const [tableMenuPosition, setTableMenuPosition] = useState({ top: 0, left: 0 })
+  const [showSensitive, setShowSensitive] = useState(false) // false = hidden, true = visible
   const bubbleMenuRef = useRef(null)
   const tableMenuRef = useRef(null)
   const isInteractingWithMenuRef = useRef(false)
@@ -237,6 +286,7 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
         },
         codeBlock: false // Disable default code block
       }),
+      Sensitive,
       CodeBlockLowlight.configure({
         lowlight,
         defaultLanguage: 'javascript',
@@ -1200,7 +1250,42 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
         </Button>
 
         <div className="w-px h-7 bg-border mx-1" />
-        
+
+        {/* Sensitive Content Controls */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className={`h-8 w-8 p-0 ${editor.isActive('sensitive') ? 'bg-yellow-500/20 text-yellow-600' : ''}`}
+          onClick={() => {
+            const { from, to } = editor.state.selection
+            const text = editor.state.doc.textBetween(from, to, '')
+
+            if (!text) {
+              alert('Please select some text first')
+              return
+            }
+
+            editor.chain().focus().toggleSensitive().run()
+          }}
+          data-active={editor.isActive('sensitive')}
+          title="Mark selected text as sensitive (password, API key, etc.)"
+        >
+          <ShieldAlert className="h-4 w-4" />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          className={`h-8 px-2 gap-1.5 text-[10px] ${showSensitive ? 'bg-primary text-primary-foreground' : ''}`}
+          onClick={() => setShowSensitive(!showSensitive)}
+          title={showSensitive ? 'Hide sensitive content' : 'Show sensitive content'}
+        >
+          {showSensitive ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+          <span>{showSensitive ? 'Hide' : 'Show'}</span>
+        </Button>
+
+        <div className="w-px h-7 bg-border mx-1" />
+
         {/* History */}
         <Button
           variant="ghost"
@@ -1222,6 +1307,36 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           <Redo2 className="h-4 w-4" />
         </Button>
       </div>
+      )}
+
+      {/* Sensitive content toggle bar - shows when there's sensitive content */}
+      {editor && !editor.isDestroyed && (
+        <div className="border-b bg-yellow-500/5 px-3 py-1.5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="h-3.5 w-3.5 text-yellow-600" />
+            <span className="text-[10px] text-muted-foreground">
+              {showSensitive ? 'Sensitive content is visible' : 'Sensitive content is hidden'}
+            </span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-[9px] gap-1"
+            onClick={() => setShowSensitive(!showSensitive)}
+          >
+            {showSensitive ? (
+              <>
+                <EyeOff className="h-3 w-3" />
+                Hide
+              </>
+            ) : (
+              <>
+                <Eye className="h-3 w-3" />
+                Show
+              </>
+            )}
+          </Button>
+        </div>
       )}
 
       {/* Link Popup - shows when hovering/clicking on a link */}
@@ -1533,12 +1648,25 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
           <Button
             variant="ghost"
             size="sm"
+            className={`h-7 w-7 p-0 ${editor.isActive('sensitive') ? 'bg-yellow-500/20 text-yellow-600' : ''}`}
+            onClick={() => editor.chain().focus().toggleSensitive().run()}
+            data-active={editor.isActive('sensitive')}
+            title="Mark selected text as sensitive (password, API key, etc.)"
+          >
+            <ShieldAlert className="h-3.5 w-3.5" />
+          </Button>
+
+          <div className="w-px h-5 bg-border" />
+
+          <Button
+            variant="ghost"
+            size="sm"
             className="h-7 w-7 p-0"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => {
               const { from, to } = editor.state.selection
               const text = editor.state.doc.textBetween(from, to, '')
-              
+
               if (!text) {
                 alert('Please select some text first')
                 return
@@ -1549,14 +1677,14 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
               if (selection && selection.rangeCount > 0) {
                 const range = selection.getRangeAt(0)
                 const rect = range.getBoundingClientRect()
-                
+
                 // Position below the selection
                 setLinkInputPosition({
                   top: rect.bottom + window.scrollY + 8,
                   left: rect.left + window.scrollX
                 })
               }
-              
+
               setShowLinkInput(!showLinkInput)
             }}
             data-active={editor.isActive('link')}
@@ -1677,7 +1805,9 @@ export function TiptapEditor({ content, onChange, editable = true, autoFocus = f
 
       {/* Editor Content with RichTextProvider for bubble menus */}
       <RichTextProvider editor={editor}>
-        <EditorContent editor={editor} />
+        <div className={showSensitive ? 'show-sensitive' : 'hide-sensitive'}>
+          <EditorContent editor={editor} />
+        </div>
       </RichTextProvider>
     </div>
   )

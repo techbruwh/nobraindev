@@ -510,3 +510,37 @@ button[data-active="true"] {
 .ProseMirror-selectednode:has(code) {
   outline: none !important;
 }
+
+/* Sensitive content styling */
+.hide-sensitive span[data-sensitive="true"] {
+  filter: blur(5px);
+  user-select: none;
+  cursor: pointer;
+  transition: filter 0.2s ease;
+  background-color: rgba(234, 179, 8, 0.1);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
+.hide-sensitive span[data-sensitive="true"]:hover {
+  filter: blur(3px);
+  background-color: rgba(234, 179, 8, 0.2);
+}
+
+.show-sensitive span[data-sensitive="true"] {
+  filter: none;
+  background-color: rgba(234, 179, 8, 0.1);
+  border-radius: 4px;
+  padding: 0 4px;
+  position: relative;
+}
+
+.show-sensitive span[data-sensitive="true"]::before {
+  content: "🔒";
+  position: absolute;
+  right: -16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  opacity: 0.6;
+}
