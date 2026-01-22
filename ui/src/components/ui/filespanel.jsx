@@ -143,9 +143,6 @@ export function FilesPanel({
   // Handle file delete
   const handleDeleteFile = async (e, file) => {
     e.stopPropagation()
-    if (!confirm(`Are you sure you want to delete "${file.filename}"? This will be deleted from both local and cloud storage.`)) {
-      return
-    }
 
     try {
       await invoke('delete_file', { id: file.id })

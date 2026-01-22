@@ -125,11 +125,9 @@ export function SnippetsPanel({
 
   const handleDeleteClick = (e, snippet) => {
     e.stopPropagation()
-    if (confirm(`Are you sure you want to delete "${snippet.title}"? This will be deleted from both local and cloud storage.`)) {
-      setDeletingId(snippet.id)
-      onDeleteSnippet?.(snippet)
-      setDeletingId(null)
-    }
+    setDeletingId(snippet.id)
+    onDeleteSnippet?.(snippet)
+    setDeletingId(null)
   }
 
   const handleCopySnippet = async (e, content) => {

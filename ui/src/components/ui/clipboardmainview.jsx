@@ -126,10 +126,6 @@ export const ClipboardMainView = forwardRef(({ onConvertToSnippet, onClipboardCh
   }
 
   const handleDeleteEntry = async (entryId) => {
-    if (!confirm('Are you sure you want to delete this clipboard entry? This will be deleted from both local and cloud storage.')) {
-      return
-    }
-
     setIsLoading(true)
     setError(null)
 
@@ -214,10 +210,6 @@ export const ClipboardMainView = forwardRef(({ onConvertToSnippet, onClipboardCh
   }
 
   const handleClearAll = async () => {
-    if (!confirm('Are you sure you want to clear all clipboard history? This will be deleted from both local and cloud storage.')) {
-      return
-    }
-
     setIsLoading(true)
     setError(null)
 
