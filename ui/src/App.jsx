@@ -1146,6 +1146,60 @@ function App() {
                   {sidebarCollapsed ? <PanelLeft className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
                 </Button>
 
+                {/* Folder Selector - Only for current snippet */}
+                {currentSnippet && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-muted-foreground">Folder:</span>
+                    <select
+                      value={currentSnippet.folder_id || 'none'}
+                      onChange={async (e) => {
+                        const newFolderId = e.target.value === 'none' ? null : parseInt(e.target.value)
+                        const updatedSnippet = {
+                          ...currentSnippet,
+                          folder_id: newFolderId
+                        }
+
+                        try {
+                          await invoke('update_snippet', {
+                            id: currentSnippet.id,
+                            snippet: {
+                            title: currentSnippet.title,
+                            language: currentSnippet.language,
+                            tags: currentSnippet.tags || null,
+                            description: currentSnippet.description || null,
+                            content: currentSnippet.content,
+                            folder_id: newFolderId,
+                            created_at: currentSnippet.created_at,
+                            updated_at: currentSnippet.updated_at
+                          }
+                          })
+
+                          // Update local state
+                          setCurrentSnippet(updatedSnippet)
+                          setHasUnsyncedChanges(true)
+
+                          // Reload to update folder counts
+                          await loadSnippets()
+                          await loadFolders()
+
+                          showToast('Folder updated', 'success')
+                        } catch (error) {
+                          console.error('Failed to update folder:', error)
+                          showToast('Failed to update folder', 'error')
+                        }
+                      }}
+                      className="h-7 px-2 text-[10px] bg-background border border-border rounded-md hover:bg-accent focus:outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer"
+                    >
+                      <option value="none">Uncategorized</option>
+                      {folders.map((folder) => (
+                        <option key={folder.id} value={folder.id}>
+                          {folder.icon || '📁'} {folder.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 {/* Auto-save indicator */}
                 {currentSnippet || (title && content) ? (
                   <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-muted/50">
