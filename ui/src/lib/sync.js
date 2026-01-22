@@ -58,6 +58,7 @@ export class SyncService {
             tags: snippet.tags,
             description: snippet.description,
             content: snippet.content,
+            folder_id: snippet.folder_id,
             created_at: snippet.created_at,
             updated_at: snippet.updated_at
           }
@@ -142,6 +143,7 @@ export class SyncService {
             tags: cloudSnippet.tags || '',
             description: cloudSnippet.description || '',
             content: cloudSnippet.content,
+            folder_id: cloudSnippet.folder_id,
             created_at: cloudSnippet.created_at,
             updated_at: cloudSnippet.updated_at
           }
@@ -200,6 +202,149 @@ export class SyncService {
       return data || null
     } catch (error) {
       console.error('Failed to check approval:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Push local folders to Supabase
+   */
+  async pushFoldersToCloud(userEmail) {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase not configured')
+    }
+
+    if (!userEmail) {
+      throw new Error('User email required for sync')
+    }
+
+    try {
+      const localFolders = await invoke('get_all_folders')
+
+      if (!localFolders || localFolders.length === 0) {
+        console.log('No local folders to sync')
+        return { pushed: 0, errors: 0 }
+      }
+
+      let pushed = 0
+      let errors = 0
+
+      for (const folder of localFolders) {
+        try {
+          const { data: existing, error: fetchError } = await supabase
+            .from('folders')
+            .select('id, updated_at')
+            .eq('user_email', userEmail)
+            .eq('local_id', folder.id)
+            .single()
+
+          if (fetchError && fetchError.code !== 'PGRST116') {
+            throw fetchError
+          }
+
+          const cloudFolder = {
+            user_email: userEmail,
+            local_id: folder.id,
+            name: folder.name,
+            icon: folder.icon,
+            created_at: folder.created_at,
+            updated_at: folder.updated_at
+          }
+
+          if (existing) {
+            const localTime = new Date(folder.updated_at).getTime()
+            const cloudTime = new Date(existing.updated_at).getTime()
+
+            if (localTime > cloudTime) {
+              const { error } = await supabase
+                .from('folders')
+                .update(cloudFolder)
+                .eq('id', existing.id)
+
+              if (error) throw error
+              pushed++
+            }
+          } else {
+            const { error } = await supabase
+              .from('folders')
+              .insert(cloudFolder)
+
+            if (error) throw error
+            pushed++
+          }
+        } catch (error) {
+          console.error(`Failed to sync folder ${folder.id}:`, error)
+          errors++
+        }
+      }
+
+      return { pushed, errors }
+    } catch (error) {
+      console.error('Push folders to cloud failed:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Pull folders from Supabase to local
+   */
+  async pullFoldersFromCloud(userEmail) {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase not configured')
+    }
+
+    if (!userEmail) {
+      throw new Error('User email required for sync')
+    }
+
+    try {
+      const { data: cloudFolders, error } = await supabase
+        .from('folders')
+        .select('*')
+        .eq('user_email', userEmail)
+
+      if (error) throw error
+
+      if (!cloudFolders || cloudFolders.length === 0) {
+        console.log('No cloud folders to sync')
+        return { pulled: 0, errors: 0 }
+      }
+
+      let pulled = 0
+      let errors = 0
+
+      const localFolders = await invoke('get_all_folders')
+      const localMap = new Map(localFolders.map(f => [f.id, f]))
+
+      for (const cloudFolder of cloudFolders) {
+        try {
+          const localFolder = localMap.get(cloudFolder.local_id)
+
+          if (localFolder) {
+            const localTime = new Date(localFolder.updated_at).getTime()
+            const cloudTime = new Date(cloudFolder.updated_at).getTime()
+
+            if (cloudTime > localTime) {
+              await invoke('update_folder', {
+                id: cloudFolder.local_id,
+                name: cloudFolder.name,
+                icon: cloudFolder.icon
+              })
+              pulled++
+            }
+          } else {
+            // Create folder locally - we'll skip this for now as it requires special handling
+            console.log('New folder from cloud - needs special handling:', cloudFolder.name)
+          }
+        } catch (error) {
+          console.error(`Failed to pull folder ${cloudFolder.id}:`, error)
+          errors++
+        }
+      }
+
+      return { pulled, errors }
+    } catch (error) {
+      console.error('Pull folders from cloud failed:', error)
       throw error
     }
   }
@@ -282,20 +427,26 @@ export class SyncService {
     try {
       console.log('Starting sync for:', userEmail)
 
-      // First push local changes (snippets)
+      // Sync folders FIRST (since snippets depend on them)
+      const foldersPush = await this.pushFoldersToCloud(userEmail)
+      const foldersPull = await this.pullFoldersFromCloud(userEmail)
+      console.log('Folders sync result:', { push: foldersPush, pull: foldersPull })
+
+      // Then sync snippets
       const pushResult = await this.pushToCloud(userEmail)
       console.log('Push result:', pushResult)
 
-      // Then pull cloud changes (snippets)
       const pullResult = await this.pullFromCloud(userEmail)
       console.log('Pull result:', pullResult)
 
       this.lastSyncTime = new Date()
 
       return {
+        foldersPushed: foldersPush.pushed,
+        foldersPulled: foldersPull.pulled,
         pushed: pushResult.pushed,
         pulled: pullResult.pulled,
-        errors: pushResult.errors + pullResult.errors,
+        errors: foldersPush.errors + foldersPull.errors + pushResult.errors + pullResult.errors,
         syncTime: this.lastSyncTime
       }
     } catch (error) {

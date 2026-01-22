@@ -8,8 +8,20 @@ pub struct Snippet {
     pub language: String,
     pub description: Option<String>,
     pub tags: Option<String>,
+    pub folder_id: Option<i64>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Folder {
+    pub id: Option<i64>,
+    pub name: String,
+    pub icon: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub snippet_count: Option<i64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

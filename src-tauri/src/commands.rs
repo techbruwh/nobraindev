@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::models::{ModelInfo, SearchResult, Snippet};
+use crate::models::{Folder, ModelInfo, SearchResult, Snippet};
 use crate::search::{get_models_dir, SearchEngine};
 use crate::search::download_model as download_model_internal;
 use crate::AppState;
@@ -224,6 +224,66 @@ pub async fn regenerate_embeddings(state: State<'_, AppState>) -> Result<String,
     }
 
     Ok(format!("Regenerated {} embeddings", count))
+}
+
+// Folder management commands
+
+#[tauri::command]
+pub fn create_folder(state: State<AppState>, name: String, icon: Option<String>) -> Result<i64, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.create_folder(&name, icon.as_deref()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_all_folders(state: State<AppState>) -> Result<Vec<Folder>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.get_all_folders().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_folder(state: State<AppState>, id: i64) -> Result<Option<Folder>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.get_folder(id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_folder(state: State<AppState>, id: i64, name: String, icon: Option<String>) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.update_folder(id, &name, icon.as_deref()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_folder(state: State<AppState>, id: i64) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.delete_folder(id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_snippets_by_folder(
+    state: State<AppState>,
+    folder_id: Option<i64>,
+) -> Result<Vec<Snippet>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.get_snippets_by_folder(folder_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_snippet_folder(
+    state: State<AppState>,
+    snippet_id: i64,
+    folder_id: Option<i64>,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.update_snippet_folder(snippet_id, folder_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn organize_snippets(
+    state: State<AppState>,
+    mappings: Vec<(i64, Option<i64>)>,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.organize_snippets(&mappings).map_err(|e| e.to_string())
 }
 
 // Clipboard management commands

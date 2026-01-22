@@ -13,6 +13,7 @@ import { SearchModal } from '@/components/ui/searchmodal'
 import { ConfirmDialog } from '@/components/ui/confirmdialog'
 import { MenuSidebar } from '@/components/ui/menusidebar'
 import { SnippetsPanel } from '@/components/ui/snippetspanel'
+import { OrganizeModal } from '@/components/ui/organizemodal'
 import { AccountPanel } from '@/components/ui/accountpanel'
 import { AccountMainView } from '@/components/ui/accountmainview'
 import { ClipboardPanel } from '@/components/ui/clipboardpanel'
@@ -96,6 +97,12 @@ function App() {
   // Selected clipboard entry ID
   const [selectedClipboardEntryId, setSelectedClipboardEntryId] = useState(null)
 
+  // Folder state
+  const [folders, setFolders] = useState([])
+  const [selectedFolderId, setSelectedFolderId] = useState(null) // null = all snippets
+  const [showOrganizeModal, setShowOrganizeModal] = useState(false)
+  const [hasSeenOrganizeModal, setHasSeenOrganizeModal] = useState(false)
+
   // Track newly created snippet IDs
   const [newSnippetIds, setNewSnippetIds] = useState(new Set())
 
@@ -121,6 +128,7 @@ function App() {
   // Load snippets and check model status on mount
   useEffect(() => {
     loadSnippets()
+    loadFolders()
     checkModelStatus()
     checkForUpdates()
 
@@ -367,6 +375,100 @@ function App() {
     }
   }
 
+  const loadFolders = async () => {
+    try {
+      const data = await invoke('get_all_folders')
+      setFolders(data)
+    } catch (error) {
+      console.error('Failed to load folders:', error)
+    }
+  }
+
+  const handleCreateFolder = async (name) => {
+    try {
+      await invoke('create_folder', { name })
+      await loadFolders()
+      // Reload snippets to ensure counts are up to date
+      await loadSnippets()
+      showToast('Folder created', 'success')
+
+      // Check if organization needed
+      const uncategorized = snippets.filter(s => !s.folder_id).length
+      if (uncategorized > 0 && !hasSeenOrganizeModal) {
+        setShowOrganizeModal(true)
+        setHasSeenOrganizeModal(true)
+      }
+    } catch (error) {
+      console.error('Failed to create folder:', error)
+      showToast('Failed to create folder', 'error')
+    }
+  }
+
+  const handleDeleteFolder = async (folderId) => {
+    try {
+      await invoke('delete_folder', { id: folderId })
+      await loadFolders()
+      if (selectedFolderId === folderId) {
+        setSelectedFolderId(null)
+        // Reload all snippets
+        await loadSnippets()
+      }
+      showToast('Folder deleted', 'success')
+    } catch (error) {
+      console.error('Failed to delete folder:', error)
+      showToast('Failed to delete folder', 'error')
+    }
+  }
+
+  const handleUpdateFolder = async (folderId, name, icon) => {
+    try {
+      await invoke('update_folder', { id: folderId, name, icon })
+      await loadFolders()
+      // Reload snippets if we changed the currently selected folder
+      if (selectedFolderId === folderId) {
+        await loadSnippets()
+      }
+      showToast('Folder updated', 'success')
+    } catch (error) {
+      console.error('Failed to update folder:', error)
+      showToast('Failed to update folder', 'error')
+    }
+  }
+
+  const handleFolderSelect = async (folderId) => {
+    setSelectedFolderId(folderId)
+
+    try {
+      const data = await invoke('get_snippets_by_folder', { folderId })
+      setFilteredSnippets(data)
+      setCurrentSnippet(null)
+      setTitle('')
+      setContent('')
+    } catch (error) {
+      console.error('Failed to load folder snippets:', error)
+      showToast('Failed to load folder', 'error')
+    }
+  }
+
+  const handleOrganizeSnippets = async (mappings) => {
+    try {
+      await invoke('organize_snippets', { mappings })
+      await loadSnippets()
+      await loadFolders()
+
+      // If a folder is currently selected, refresh the view to show updated snippets
+      if (selectedFolderId !== null) {
+        const data = await invoke('get_snippets_by_folder', { folderId: selectedFolderId })
+        setFilteredSnippets(data)
+      }
+
+      showToast('Snippets organized', 'success')
+    } catch (error) {
+      console.error('Failed to organize snippets:', error)
+      showToast('Failed to organize snippets', 'error')
+    }
+  }
+
   const checkModelStatus = async () => {
     try {
       const status = await invoke('get_model_status')
@@ -513,6 +615,7 @@ function App() {
       tags: null,
       description: null,
       content: '',
+      folder_id: selectedFolderId || null,
       created_at: '',
       updated_at: ''
     }
@@ -596,6 +699,7 @@ function App() {
       tags: tags.trim() || null,
       description: description.trim() || null,
       content: content.trim(),
+      folder_id: currentSnippet?.folder_id || selectedFolderId || null,
       created_at: '',
       updated_at: ''
     }
@@ -831,10 +935,17 @@ function App() {
       {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Menu Sidebar - Always visible */}
-        <MenuSidebar 
+        <MenuSidebar
           activeMenu={activeMenu}
           onMenuChange={setActiveMenu}
           sidebarCollapsed={sidebarCollapsed}
+          folders={folders}
+          selectedFolderId={selectedFolderId}
+          onFolderSelect={handleFolderSelect}
+          onCreateFolder={handleCreateFolder}
+          onUpdateFolder={handleUpdateFolder}
+          onDeleteFolder={handleDeleteFolder}
+          snippets={snippets}
         />
 
         {/* Resizable Content Sidebar */}
@@ -872,6 +983,9 @@ function App() {
                 // Optionally handle sync start
               }}
               newSnippetIds={newSnippetIds}
+              currentFolderId={selectedFolderId}
+              currentFolderName={selectedFolderId ? folders.find(f => f.id === selectedFolderId)?.name : null}
+              currentFolderIcon={selectedFolderId ? folders.find(f => f.id === selectedFolderId)?.icon : null}
             />
           )}
         </div>
@@ -1147,6 +1261,15 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Organize Modal */}
+      <OrganizeModal
+        isOpen={showOrganizeModal}
+        onClose={() => setShowOrganizeModal(false)}
+        snippets={snippets.filter(s => !s.folder_id)}
+        folders={folders}
+        onOrganize={handleOrganizeSnippets}
+      />
 
       {/* Confirmation Dialog */}
       <ConfirmDialog

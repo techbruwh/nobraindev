@@ -353,7 +353,7 @@ export const ClipboardPanel = forwardRef(({ onConvertToSnippet, onClipboardChang
               ) : hasUnsyncedClipboard ? (
                 <ArrowUp className="h-3 w-3" />
               ) : (
-                <Cloud className="h-3 w-3" />
+                <CheckCircle className="h-3 w-3" />
               )}
               {isSyncing ? 'Syncing...' : hasUnsyncedClipboard ? 'Sync' : 'Synced'}
             </Button>

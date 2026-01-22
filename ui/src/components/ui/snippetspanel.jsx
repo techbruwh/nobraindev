@@ -17,7 +17,10 @@ export function SnippetsPanel({
   hasUnsyncedChanges,
   onSyncComplete,
   onSyncStart,
-  newSnippetIds = new Set()
+  newSnippetIds = new Set(),
+  currentFolderId,
+  currentFolderName,
+  currentFolderIcon
 }) {
   const { user } = useSupabaseAuth()
   const isSignedIn = !!user
@@ -142,11 +145,14 @@ export function SnippetsPanel({
       <div className="p-3 border-b">
         <div className="flex items-center gap-2">
           <FileCode className="h-4 w-4" />
-          <h2 className="text-sm font-semibold">Snippets</h2>
+          <h2 className="text-sm font-semibold">
+            {currentFolderIcon && <span className="mr-1">{currentFolderIcon}</span>}
+            {currentFolderName || 'Snippets'}
+          </h2>
           <Badge variant="secondary" className="text-[9px]">
             {snippets.length}
           </Badge>
-          
+
           {/* Sync Button */}
           {isSignedIn && syncApproval?.approved && (
             <Button
@@ -165,7 +171,7 @@ export function SnippetsPanel({
               ) : hasUnsyncedChanges ? (
                 <ArrowUp className="h-3 w-3" />
               ) : (
-                <Cloud className="h-3 w-3" />
+                <CheckCircle className="h-3 w-3" />
               )}
               {isSyncing ? 'Syncing...' : hasUnsyncedChanges ? 'Sync' : 'Synced'}
             </Button>

@@ -3,15 +3,32 @@ use chrono::Utc;
 use rusqlite::{params, Connection, OptionalExtension};
 use std::path::PathBuf;
 
-use crate::models::Snippet;
+use crate::models::{Snippet, Folder};
 
 const MODEL_VERSION: &str = "all-MiniLM-L6-v2";
+
+// List of random folder emojis
+const FOLDER_EMOJIS: &[&str] = &[
+    "📁", "📂", "🗂️", "📚", "📖", "📝", "✏️", "🎨", "🎯", "💡",
+    "🔥", "⚡", "🚀", "💻", "🖥️", "📱", "🌐", "🔧", "⚙️", "🔩",
+    "🎵", "🎬", "📷", "🎥", "🎮", "🕹️", "🗺️", "🧭", "📊", "📈",
+    "💼", "📋", "📌", "📍", "✂️", "📏", "🖊️", "🖋️", "💎", "🔑",
+    "🏠", "🏢", "🏗️", "🏭", "🌟", "⭐", "🌙", "☀️", "🌈", "🍀",
+];
 
 pub struct Database {
     conn: Connection,
 }
 
 impl Database {
+    fn get_random_emoji() -> &'static str {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as usize;
+        FOLDER_EMOJIS[timestamp % FOLDER_EMOJIS.len()]
+    }
     pub fn new() -> Result<Self> {
         let db_path = Self::get_db_path()?;
         
@@ -38,6 +55,54 @@ impl Database {
     }
 
     fn initialize(&self) -> Result<()> {
+        // Create folders table first (before snippets, since snippets references it)
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS folders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                icon TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )",
+            [],
+        )?;
+
+        // Migrate: Add icon to existing folders table if it doesn't exist
+        let has_icon: std::result::Result<bool, rusqlite::Error> = self.conn.query_row(
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('folders') WHERE name = 'icon'",
+            [],
+            |row| row.get(0)
+        );
+
+        if has_icon.is_err() || !has_icon.unwrap_or(false) {
+            let _ = self.conn.execute(
+                "ALTER TABLE folders ADD COLUMN icon TEXT",
+                [],
+            );
+        }
+
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_folders_name ON folders(name)",
+            [],
+        )?;
+
+        // Migrate: Add folder_id to existing snippets table BEFORE creating the table
+        // SQLite doesn't support IF NOT EXISTS for ALTER TABLE, so we check the schema first
+        let has_folder_id: std::result::Result<bool, rusqlite::Error> = self.conn.query_row(
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('snippets') WHERE name = 'folder_id'",
+            [],
+            |row| row.get(0)
+        );
+
+        // If the query fails or returns false, add the column
+        if has_folder_id.is_err() || !has_folder_id.unwrap_or(false) {
+            let _ = self.conn.execute(
+                "ALTER TABLE snippets ADD COLUMN folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL",
+                [],
+            );
+        }
+
+        // Now create snippets table (with folder_id) - this only affects new installs
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS snippets (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,6 +111,7 @@ impl Database {
                 language TEXT NOT NULL,
                 description TEXT,
                 tags TEXT,
+                folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )",
@@ -57,11 +123,25 @@ impl Database {
             "CREATE INDEX IF NOT EXISTS idx_title ON snippets(title)",
             [],
         )?;
-        
+
         self.conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_language ON snippets(language)",
             [],
         )?;
+
+        // Only create folder index if folder_id exists
+        let folder_id_exists: std::result::Result<bool, _> = self.conn.query_row(
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('snippets') WHERE name = 'folder_id'",
+            [],
+            |row| row.get(0)
+        );
+
+        if folder_id_exists.unwrap_or(false) {
+            let _ = self.conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_snippets_folder ON snippets(folder_id)",
+                [],
+            );
+        }
 
         // Create embeddings table for semantic search
         self.conn.execute(
@@ -97,16 +177,17 @@ impl Database {
 
     pub fn create_snippet(&self, snippet: &Snippet) -> Result<i64> {
         let now = Utc::now().to_rfc3339();
-        
+
         self.conn.execute(
-            "INSERT INTO snippets (title, content, language, description, tags, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO snippets (title, content, language, description, tags, folder_id, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 snippet.title,
                 snippet.content,
                 snippet.language,
                 snippet.description,
                 snippet.tags,
+                snippet.folder_id,
                 now,
                 now
             ],
@@ -117,7 +198,7 @@ impl Database {
 
     pub fn get_snippet(&self, id: i64) -> Result<Option<Snippet>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, title, content, language, description, tags, created_at, updated_at
+            "SELECT id, title, content, language, description, tags, folder_id, created_at, updated_at
              FROM snippets WHERE id = ?1"
         )?;
 
@@ -129,8 +210,9 @@ impl Database {
                 language: row.get(3)?,
                 description: row.get(4)?,
                 tags: row.get(5)?,
-                created_at: row.get(6)?,
-                updated_at: row.get(7)?,
+                folder_id: row.get(6)?,
+                created_at: row.get(7)?,
+                updated_at: row.get(8)?,
             })
         }).optional()?;
 
@@ -139,7 +221,7 @@ impl Database {
 
     pub fn get_all_snippets(&self) -> Result<Vec<Snippet>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, title, content, language, description, tags, created_at, updated_at
+            "SELECT id, title, content, language, description, tags, folder_id, created_at, updated_at
              FROM snippets ORDER BY updated_at DESC"
         )?;
 
@@ -151,8 +233,9 @@ impl Database {
                 language: row.get(3)?,
                 description: row.get(4)?,
                 tags: row.get(5)?,
-                created_at: row.get(6)?,
-                updated_at: row.get(7)?,
+                folder_id: row.get(6)?,
+                created_at: row.get(7)?,
+                updated_at: row.get(8)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -162,17 +245,18 @@ impl Database {
 
     pub fn update_snippet(&self, id: i64, snippet: &Snippet) -> Result<()> {
         let now = Utc::now().to_rfc3339();
-        
+
         self.conn.execute(
-            "UPDATE snippets 
-             SET title = ?1, content = ?2, language = ?3, description = ?4, tags = ?5, updated_at = ?6
-             WHERE id = ?7",
+            "UPDATE snippets
+             SET title = ?1, content = ?2, language = ?3, description = ?4, tags = ?5, folder_id = ?6, updated_at = ?7
+             WHERE id = ?8",
             params![
                 snippet.title,
                 snippet.content,
                 snippet.language,
                 snippet.description,
                 snippet.tags,
+                snippet.folder_id,
                 now,
                 id
             ],
@@ -188,13 +272,13 @@ impl Database {
 
     pub fn search_snippets(&self, query: &str) -> Result<Vec<Snippet>> {
         let search_pattern = format!("%{}%", query);
-        
+
         let mut stmt = self.conn.prepare(
-            "SELECT id, title, content, language, description, tags, created_at, updated_at
-             FROM snippets 
-             WHERE title LIKE ?1 
-                OR content LIKE ?1 
-                OR description LIKE ?1 
+            "SELECT id, title, content, language, description, tags, folder_id, created_at, updated_at
+             FROM snippets
+             WHERE title LIKE ?1
+                OR content LIKE ?1
+                OR description LIKE ?1
                 OR tags LIKE ?1
              ORDER BY updated_at DESC"
         )?;
@@ -207,13 +291,161 @@ impl Database {
                 language: row.get(3)?,
                 description: row.get(4)?,
                 tags: row.get(5)?,
-                created_at: row.get(6)?,
-                updated_at: row.get(7)?,
+                folder_id: row.get(6)?,
+                created_at: row.get(7)?,
+                updated_at: row.get(8)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
 
         Ok(snippets)
+    }
+
+    // Folder CRUD methods
+    pub fn create_folder(&self, name: &str, icon: Option<&str>) -> Result<i64> {
+        let now = Utc::now().to_rfc3339();
+        let folder_icon = icon.unwrap_or_else(|| Self::get_random_emoji());
+
+        self.conn.execute(
+            "INSERT INTO folders (name, icon, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![name, folder_icon, now, now],
+        )?;
+
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    pub fn get_all_folders(&self) -> Result<Vec<Folder>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, name, icon, created_at, updated_at
+             FROM folders ORDER BY name"
+        )?;
+
+        let folders = stmt.query_map([], |row| {
+            Ok(Folder {
+                id: Some(row.get(0)?),
+                name: row.get(1)?,
+                icon: row.get(2)?,
+                created_at: row.get(3)?,
+                updated_at: row.get(4)?,
+                snippet_count: None,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(folders)
+    }
+
+    pub fn get_folder(&self, id: i64) -> Result<Option<Folder>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT f.id, f.name, f.icon, f.created_at, f.updated_at, COUNT(s.id) as snippet_count
+             FROM folders f
+             LEFT JOIN snippets s ON s.folder_id = f.id
+             WHERE f.id = ?1
+             GROUP BY f.id"
+        )?;
+
+        let folder = stmt.query_row(params![id], |row| {
+            Ok(Folder {
+                id: Some(row.get(0)?),
+                name: row.get(1)?,
+                icon: row.get(2)?,
+                created_at: row.get(3)?,
+                updated_at: row.get(4)?,
+                snippet_count: Some(row.get(5)?),
+            })
+        }).optional()?;
+
+        Ok(folder)
+    }
+
+    pub fn update_folder(&self, id: i64, name: &str, icon: Option<&str>) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+
+        if let Some(icon_str) = icon {
+            self.conn.execute(
+                "UPDATE folders SET name = ?1, icon = ?2, updated_at = ?3 WHERE id = ?4",
+                params![name, icon_str, now, id],
+            )?;
+        } else {
+            self.conn.execute(
+                "UPDATE folders SET name = ?1, updated_at = ?2 WHERE id = ?3",
+                params![name, now, id],
+            )?;
+        }
+
+        Ok(())
+    }
+
+    pub fn delete_folder(&self, id: i64) -> Result<()> {
+        // Set all snippets in this folder to uncategorized (folder_id = NULL)
+        self.conn.execute(
+            "UPDATE snippets SET folder_id = NULL WHERE folder_id = ?1",
+            params![id],
+        )?;
+
+        // Then delete the folder
+        self.conn.execute("DELETE FROM folders WHERE id = ?1", params![id])?;
+
+        Ok(())
+    }
+
+    // Snippet-folder relationship methods
+    pub fn get_snippets_by_folder(&self, folder_id: Option<i64>) -> Result<Vec<Snippet>> {
+        let sql = if folder_id.is_some() {
+            "SELECT id, title, content, language, description, tags, folder_id, created_at, updated_at
+             FROM snippets WHERE folder_id = ?1 ORDER BY updated_at DESC"
+        } else {
+            "SELECT id, title, content, language, description, tags, folder_id, created_at, updated_at
+             FROM snippets WHERE folder_id IS NULL ORDER BY updated_at DESC"
+        };
+
+        let mut stmt = self.conn.prepare(sql)?;
+
+        let snippet_mapper = |row: &rusqlite::Row| -> std::result::Result<Snippet, rusqlite::Error> {
+            Ok(Snippet {
+                id: Some(row.get(0)?),
+                title: row.get(1)?,
+                content: row.get(2)?,
+                language: row.get(3)?,
+                description: row.get(4)?,
+                tags: row.get(5)?,
+                folder_id: row.get(6)?,
+                created_at: row.get(7)?,
+                updated_at: row.get(8)?,
+            })
+        };
+
+        let snippets = if let Some(fid) = folder_id {
+            stmt.query_map(params![fid], snippet_mapper)?
+        } else {
+            stmt.query_map(params![], snippet_mapper)?
+        }
+        .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(snippets)
+    }
+
+    pub fn update_snippet_folder(&self, snippet_id: i64, folder_id: Option<i64>) -> Result<()> {
+        self.conn.execute(
+            "UPDATE snippets SET folder_id = ?1 WHERE id = ?2",
+            params![folder_id, snippet_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn organize_snippets(&self, mappings: &[(i64, Option<i64>)]) -> Result<()> {
+        let tx = self.conn.unchecked_transaction()?;
+
+        for (snippet_id, folder_id) in mappings {
+            tx.execute(
+                "UPDATE snippets SET folder_id = ?1 WHERE id = ?2",
+                params![folder_id, snippet_id],
+            )?;
+        }
+
+        tx.commit()?;
+        Ok(())
     }
 
     pub fn store_embedding(&self, snippet_id: i64, embedding: &[f32]) -> Result<()> {
