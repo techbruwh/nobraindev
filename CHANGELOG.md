@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.0] - 2026-01-22
+
+### ✨ Features
+-  support file manager
+
+
+
 ## [2.0.2] - 2026-01-22
 
 ### ✨ Features
