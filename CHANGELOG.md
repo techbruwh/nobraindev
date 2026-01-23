@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.2] - 2026-01-23
+
+### 🐛 Bug Fixes
+-  fix delete confirmation on the file manager
+-  fix delete button confirmation dialog
+
+
+
 ## [2.1.1] - 2026-01-22
 
 ### 🐛 Bug Fixes
