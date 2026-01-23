@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.3] - 2026-01-23
+
+### 🐛 Bug Fixes
+-  ui sync function
+-  improve clipboard sync
+-  improve file manager view
+-  better sync process for files
+-  improve sync functionality
+
+
+
 ## [2.1.2] - 2026-01-23
 
 ### 🐛 Bug Fixes

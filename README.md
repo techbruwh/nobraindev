@@ -5,7 +5,7 @@
   
   ### A powerful, tiny, offline-first, AI-powered desktop application for managing notes and clipboard written in Rust.
   
-  ![NoBrainDev](https://img.shields.io/badge/version-2.1.2-blue)
+  ![NoBrainDev](https://img.shields.io/badge/version-2.1.3-blue)
   ![License](https://img.shields.io/badge/license-MIT-green)
   ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 </div>
