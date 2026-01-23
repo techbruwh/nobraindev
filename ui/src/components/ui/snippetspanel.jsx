@@ -18,6 +18,7 @@ export function SnippetsPanel({
   onSyncComplete,
   onSyncStart,
   newSnippetIds = new Set(),
+  unsyncedSnippetIds = new Set(),
   currentFolderId,
   currentFolderName,
   currentFolderIcon,
@@ -285,13 +286,13 @@ export function SnippetsPanel({
                           <Badge
                             variant="outline"
                             className={`text-[7px] px-1 py-0 ${
-                              newSnippetIds.has(snippet.id)
+                              unsyncedSnippetIds.has(snippet.id)
                                 ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30'
                                 : 'bg-green-500/10 text-green-600 border-green-500/30'
                             }`}
-                            title={newSnippetIds.has(snippet.id) ? 'Not synced to cloud' : 'Synced to cloud'}
+                            title={unsyncedSnippetIds.has(snippet.id) ? 'Not synced to cloud' : 'Synced to cloud'}
                           >
-                            {newSnippetIds.has(snippet.id) ? (
+                            {unsyncedSnippetIds.has(snippet.id) ? (
                               <Cloud className="h-2.5 w-2.5" />
                             ) : (
                               <CheckCircle className="h-2.5 w-2.5" />
@@ -342,13 +343,13 @@ export function SnippetsPanel({
                             <Badge
                               variant="outline"
                               className={`text-[7px] px-1 py-0 ${
-                                newSnippetIds.has(snippet.id)
+                                unsyncedSnippetIds.has(snippet.id)
                                   ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30'
                                   : 'bg-green-500/10 text-green-600 border-green-500/30'
                               }`}
-                              title={newSnippetIds.has(snippet.id) ? 'Not synced to cloud' : 'Synced to cloud'}
+                              title={unsyncedSnippetIds.has(snippet.id) ? 'Not synced to cloud' : 'Synced to cloud'}
                             >
-                              {newSnippetIds.has(snippet.id) ? (
+                              {unsyncedSnippetIds.has(snippet.id) ? (
                                 <Cloud className="h-2.5 w-2.5" />
                               ) : (
                                 <CheckCircle className="h-2.5 w-2.5" />

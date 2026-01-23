@@ -119,6 +119,9 @@ function App() {
   // Track newly created snippet IDs
   const [newSnippetIds, setNewSnippetIds] = useState(new Set())
 
+  // Track which snippet IDs have unsynced changes
+  const [unsyncedSnippetIds, setUnsyncedSnippetIds] = useState(new Set())
+
   // Deletion tracking state
   const [isDeletingSnippet, setIsDeletingSnippet] = useState(false)
   const [deleteError, setDeleteError] = useState(null)
@@ -811,6 +814,9 @@ function App() {
           // Track as new snippet
           setNewSnippetIds(prevIds => new Set([...prevIds, newSnippet.id]))
 
+          // Also track as unsynced
+          setUnsyncedSnippetIds(prevIds => new Set([...prevIds, newSnippet.id]))
+
           // Remove NEW badge after 5 seconds
           setTimeout(() => {
             setNewSnippetIds(ids => {
@@ -896,6 +902,17 @@ function App() {
 
       // Mark as having unsynced changes
       setHasUnsyncedChanges(true)
+
+      // Track this specific snippet as unsynced
+      setSnippets(prev => {
+        const savedSnippet = prev.find(s =>
+          savedId ? s.id === savedId : s.title === savedTitle
+        )
+        if (savedSnippet) {
+          setUnsyncedSnippetIds(prevIds => new Set([...prevIds, savedSnippet.id]))
+        }
+        return prev
+      })
 
       await loadSnippets()
 
@@ -1191,12 +1208,14 @@ function App() {
               hasUnsyncedChanges={hasUnsyncedChanges}
               onSyncComplete={(syncTime) => {
                 setHasUnsyncedChanges(false)
+                setUnsyncedSnippetIds(new Set())
                 setLastSyncTime(syncTime)
               }}
               onSyncStart={() => {
                 // Optionally handle sync start
               }}
               newSnippetIds={newSnippetIds}
+              unsyncedSnippetIds={unsyncedSnippetIds}
               currentFolderId={selectedFolderId}
               currentFolderName={
                 selectedFolderId === 'uncategorized'
@@ -1387,6 +1406,7 @@ function App() {
                 lastSyncTime={lastSyncTime}
                 onSyncComplete={(syncTime) => {
                   setHasUnsyncedChanges(false)
+                  setUnsyncedSnippetIds(new Set())
                   setLastSyncTime(syncTime)
                 }}
                 onSyncStart={() => {
