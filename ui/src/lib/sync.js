@@ -889,6 +889,18 @@ export class SyncService {
                 .eq('id', existing.id)
 
               if (error) throw error
+
+              // Update local database with cloud storage path
+              try {
+                await invoke('update_file_cloud_path', {
+                  id: file.id,
+                  cloudStoragePath: cloudPath
+                })
+                console.log(`✅ Updated local cloud path for: ${file.filename}`)
+              } catch (localUpdateError) {
+                console.warn(`⚠️  Failed to update local cloud path:`, localUpdateError)
+              }
+
               pushed++
               console.log(`✅ File updated: ${file.filename}`)
             } else {
@@ -901,6 +913,18 @@ export class SyncService {
               .insert(cloudFile)
 
             if (error) throw error
+
+            // Update local database with cloud storage path
+            try {
+              await invoke('update_file_cloud_path', {
+                id: file.id,
+                cloudStoragePath: cloudPath
+              })
+              console.log(`✅ Updated local cloud path for: ${file.filename}`)
+            } catch (localUpdateError) {
+              console.warn(`⚠️  Failed to update local cloud path:`, localUpdateError)
+            }
+
             pushed++
             console.log(`✅ File inserted: ${file.filename}`)
           }

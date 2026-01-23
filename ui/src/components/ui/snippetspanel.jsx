@@ -141,12 +141,14 @@ export function SnippetsPanel({
       {/* Header */}
       <div className="p-3 border-b">
         <div className="flex items-center gap-2">
-          <FileCode className="h-4 w-4" />
-          <h2 className="text-sm font-semibold">
+          {!currentFolderIcon && <FileCode className="h-4 w-4" />}
+          <h2 className="text-sm font-semibold truncate">
             {currentFolderIcon && <span className="mr-1">{currentFolderIcon}</span>}
-            {currentFolderName || 'Snippets'}
+            <span title={currentFolderName || 'Snippets'}>
+              {currentFolderName || 'Snippets'}
+            </span>
           </h2>
-          <Badge variant="secondary" className="text-[9px]">
+          <Badge variant="secondary" className="text-[9px] flex-shrink-0">
             {snippets.length}
           </Badge>
 

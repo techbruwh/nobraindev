@@ -7,6 +7,9 @@ import { syncService } from '@/lib/sync'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 
+// Module-level variable to persist synced file IDs across component unmounts/remounts
+let globallySyncedFileIds = new Set()
+
 export function FilesPanel({
   currentFolderId,
   currentFolderName,
@@ -32,7 +35,10 @@ export function FilesPanel({
   const [uploadingFile, setUploadingFile] = useState(null)
 
   // Calculate if there are any unsynced files (files without cloud_storage_path)
-  const hasUnsyncedFiles = files.some(file => !file.cloud_storage_path)
+  // Exclude files that were just synced (using global variable to persist across unmounts)
+  const hasUnsyncedFiles = files.some(file =>
+    !file.cloud_storage_path && !globallySyncedFileIds.has(file.id)
+  )
 
   // Sync state
   const [isSyncing, setIsSyncing] = useState(false)
@@ -154,6 +160,9 @@ export function FilesPanel({
         // Notify parent
         onUploadComplete?.()
 
+        // Clear synced IDs since new files were uploaded
+        globallySyncedFileIds.clear()
+
         setUploadingFile(null)
       }
     } catch (err) {
@@ -244,6 +253,9 @@ export function FilesPanel({
         message: 'Secured cloud sync successful'
       })
 
+      // Mark all current files as synced (to persist across re-renders/menu switches/unmounts)
+      globallySyncedFileIds = new Set(files.map(f => f.id))
+
       // Reload files to get updated cloud_storage_path
       await loadFiles()
 
@@ -286,12 +298,14 @@ export function FilesPanel({
       {/* Header */}
       <div className="p-3 border-b">
         <div className="flex items-center gap-2">
-          <FileText className="h-4 w-4" />
-          <h2 className="text-sm font-semibold">
+          {!currentFolderIcon && <FileText className="h-4 w-4" />}
+          <h2 className="text-sm font-semibold truncate">
             {currentFolderIcon && <span className="mr-1">{currentFolderIcon}</span>}
-            {currentFolderName || 'Files'}
+            <span title={currentFolderName || 'Files'}>
+              {currentFolderName || 'Files'}
+            </span>
           </h2>
-          <Badge variant="secondary" className="text-[9px]">
+          <Badge variant="secondary" className="text-[9px] flex-shrink-0">
             {files.length}
           </Badge>
 
@@ -435,13 +449,13 @@ export function FilesPanel({
                           <Badge
                             variant="outline"
                             className={`text-[7px] px-1 py-0 ${
-                              !file.cloud_storage_path
+                              !file.cloud_storage_path && !globallySyncedFileIds.has(file.id)
                                 ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30'
                                 : 'bg-green-500/10 text-green-600 border-green-500/30'
                             }`}
-                            title={!file.cloud_storage_path ? 'Not synced to cloud' : 'Synced to cloud'}
+                            title={!file.cloud_storage_path && !globallySyncedFileIds.has(file.id) ? 'Not synced to cloud' : 'Synced to cloud'}
                           >
-                            {!file.cloud_storage_path ? (
+                            {!file.cloud_storage_path && !globallySyncedFileIds.has(file.id) ? (
                               <Cloud className="h-2.5 w-2.5" />
                             ) : (
                               <CheckCircle className="h-2.5 w-2.5" />
@@ -490,13 +504,13 @@ export function FilesPanel({
                             <Badge
                               variant="outline"
                               className={`text-[7px] px-1 py-0 ${
-                                !file.cloud_storage_path
+                                !file.cloud_storage_path && !globallySyncedFileIds.has(file.id)
                                   ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30'
                                   : 'bg-green-500/10 text-green-600 border-green-500/30'
                               }`}
-                              title={!file.cloud_storage_path ? 'Not synced to cloud' : 'Synced to cloud'}
+                              title={!file.cloud_storage_path && !globallySyncedFileIds.has(file.id) ? 'Not synced to cloud' : 'Synced to cloud'}
                             >
-                              {!file.cloud_storage_path ? (
+                              {!file.cloud_storage_path && !globallySyncedFileIds.has(file.id) ? (
                                 <Cloud className="h-2.5 w-2.5" />
                               ) : (
                                 <CheckCircle className="h-2.5 w-2.5" />

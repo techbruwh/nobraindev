@@ -114,6 +114,7 @@ function App() {
 
   // Files state (for badge counts in sidebar)
   const [files, setFiles] = useState([])
+  const [allFiles, setAllFiles] = useState([]) // Always contains ALL files for badge counts
 
   // Track newly created snippet IDs
   const [newSnippetIds, setNewSnippetIds] = useState(new Set())
@@ -487,23 +488,29 @@ function App() {
     }
   }
 
-  const loadFiles = async () => {
+  const loadFiles = async (folderId = selectedFolderId) => {
     try {
+      // Always load all files for badge counts
+      const allFilesData = await invoke('get_all_files')
+      setAllFiles(allFilesData || [])
+
+      // Load filtered files based on folder
       let result
-      if (selectedFolderId === null) {
+      if (folderId === null) {
         // All files
-        result = await invoke('get_all_files')
-      } else if (selectedFolderId === 'uncategorized') {
+        result = allFilesData
+      } else if (folderId === 'uncategorized') {
         // Uncategorized files
         result = await invoke('get_files_by_folder', { folderId: null })
       } else {
         // Specific folder
-        result = await invoke('get_files_by_folder', { folderId: selectedFolderId })
+        result = await invoke('get_files_by_folder', { folderId: folderId })
       }
       setFiles(result || [])
     } catch (error) {
       console.error('Failed to load files:', error)
       setFiles([])
+      setAllFiles([])
     }
   }
 
@@ -567,7 +574,7 @@ function App() {
 
     // Load files when switching to files menu
     if (menu === 'files') {
-      await loadFiles()
+      await loadFiles(selectedFolderId)
     }
   }
 
@@ -576,8 +583,8 @@ function App() {
 
     // Load based on active menu
     if (activeMenu === 'files') {
-      // Load files for badge count
-      await loadFiles()
+      // Load files for badge count, passing the new folderId directly
+      await loadFiles(folderId)
       return
     }
 
@@ -1153,7 +1160,7 @@ function App() {
           onUpdateFolder={handleUpdateFolder}
           onDeleteFolder={handleDeleteFolder}
           snippets={snippets}
-          files={files}
+          files={allFiles}
         />
 
         {/* Resizable Content Sidebar */}
@@ -1192,8 +1199,20 @@ function App() {
               }}
               newSnippetIds={newSnippetIds}
               currentFolderId={selectedFolderId}
-              currentFolderName={selectedFolderId ? folders.find(f => f.id === selectedFolderId)?.name : null}
-              currentFolderIcon={selectedFolderId ? folders.find(f => f.id === selectedFolderId)?.icon : null}
+              currentFolderName={
+                selectedFolderId === 'uncategorized'
+                  ? 'Uncategorized'
+                  : selectedFolderId
+                  ? folders.find(f => f.id === selectedFolderId)?.name
+                  : null
+              }
+              currentFolderIcon={
+                selectedFolderId === 'uncategorized'
+                  ? '📂'
+                  : selectedFolderId
+                  ? folders.find(f => f.id === selectedFolderId)?.icon
+                  : null
+              }
               viewMode={snippetsViewMode}
               onViewModeChange={setSnippetsViewMode}
             />

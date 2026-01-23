@@ -81,8 +81,8 @@ export function MenuSidebar({
     onUpdateFolder(folderId, folder?.name || '', emoji)
   }
 
-  // Show folders only when snippets or files menu is active and sidebar is not collapsed
-  const showFolders = (activeMenu === 'snippets' || activeMenu === 'files') && !sidebarCollapsed
+  // Show folders for all menus when sidebar is not collapsed
+  const showFolders = !sidebarCollapsed
 
   return (
     <div className={`h-full flex flex-col py-2 gap-1 bg-background relative overflow-hidden border-r transition-all duration-300 ${
@@ -92,7 +92,7 @@ export function MenuSidebar({
       <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 via-purple-500/5 to-pink-500/5 pointer-events-none" />
 
       {/* Menu Items */}
-      <div className="flex flex-col gap-1 px-1 z-10">
+      <div className="flex flex-col gap-1 px-2 z-10">
         {menuItems.map((item) => {
           const Icon = item.icon
           const isActive = activeMenu === item.id
@@ -101,7 +101,7 @@ export function MenuSidebar({
             <button
               key={item.id}
               onClick={() => onMenuChange(item.id)}
-              className={`relative w-full h-10 flex items-center px-3 rounded-md transition-all group ${
+              className={`relative w-full h-9 flex items-center justify-between gap-2 px-2 rounded-md transition-all group ${
                 isActive
                   ? 'bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10 border border-purple-500/30'
                   : 'hover:bg-accent border border-transparent'
@@ -110,17 +110,19 @@ export function MenuSidebar({
             >
               {/* Active indicator */}
               {isActive && (
-                <div className="absolute -left-[1px] top-1/2 -translate-y-1/2 w-0.5 h-6 bg-gradient-to-b from-blue-500 via-purple-500 to-pink-500 rounded-r" />
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-px w-0.5 h-5 bg-gradient-to-b from-blue-500 via-purple-500 to-pink-500 rounded-r" />
               )}
 
-              <Icon className={`h-4 w-4 transition-colors flex-shrink-0 ${
+              {/* Icon - always visible and aligned */}
+              <Icon className={`h-4 w-4 flex-shrink-0 ${
                 isActive
                   ? 'text-purple-600'
                   : 'text-muted-foreground group-hover:text-foreground'
               }`} />
 
+              {/* Text - only when expanded */}
               {showFolders && (
-                <span className={`ml-2 text-sm font-medium ${
+                <span className={`ml-2 text-xs font-medium flex-1 text-left ${
                   isActive ? 'text-purple-600' : 'text-muted-foreground'
                 }`}>
                   {item.label}
@@ -131,7 +133,7 @@ export function MenuSidebar({
         })}
       </div>
 
-      {/* Folders Section - Only show when snippets or files menu is active */}
+      {/* Folders Section */}
       {showFolders && (
         <div className="flex-1 flex flex-col overflow-hidden mt-2 z-10">
           {/* Folders Header */}
@@ -165,18 +167,18 @@ export function MenuSidebar({
           </div>
 
           {/* Folders List */}
-          <div className="flex-1 overflow-y-auto px-2 py-1 space-y-0.5">
+          <div className="flex-1 overflow-y-auto px-2 py-1 space-y-px">
             {/* All Snippets / All Files */}
             <button
               onClick={() => onFolderSelect(null)}
-              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors ${
+              className={`w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md transition-colors ${
                 selectedFolderId === null
                   ? 'bg-purple-500/10 text-purple-600'
                   : 'hover:bg-accent text-muted-foreground hover:text-foreground'
               }`}
             >
-              <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />
-              <span className="text-xs flex-1 text-left">
+              <FolderOpen className="h-4 w-4 flex-shrink-0" />
+              <span className="text-xs flex-1 text-left truncate">
                 {activeMenu === 'files' ? 'All Files' : 'All Snippets'}
               </span>
               <span className={`text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${
@@ -187,31 +189,29 @@ export function MenuSidebar({
             </button>
 
             {/* Uncategorized */}
-            {(activeMenu === 'files' ? files : snippets).some(item => !item.folder_id) && (
-              <button
-                onClick={() => onFolderSelect('uncategorized')}
-                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors ${
-                  selectedFolderId === 'uncategorized'
-                    ? 'bg-purple-500/10 text-purple-600'
-                    : 'hover:bg-accent text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <Folder className="h-3.5 w-3.5 flex-shrink-0" />
-                <span className="text-xs flex-1 text-left">Uncategorized</span>
-                <span className={`text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${
-                  selectedFolderId === 'uncategorized' ? 'bg-purple-500/20' : 'bg-muted'
-                }`}>
-                  {getFolderCount('uncategorized')}
-                </span>
-              </button>
-            )}
+            <button
+              onClick={() => onFolderSelect('uncategorized')}
+              className={`w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md transition-colors ${
+                selectedFolderId === 'uncategorized'
+                  ? 'bg-purple-500/10 text-purple-600'
+                  : 'hover:bg-accent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Folder className="h-4 w-4 flex-shrink-0" />
+              <span className="text-xs flex-1 text-left truncate">Uncategorized</span>
+              <span className={`text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                selectedFolderId === 'uncategorized' ? 'bg-purple-500/20' : 'bg-muted'
+              }`}>
+                {getFolderCount('uncategorized')}
+              </span>
+            </button>
 
             {/* Custom Folders */}
             {folders.map((folder) => (
               <div key={folder.id} className="group">
                 {editingFolderId === folder.id ? (
                   // Edit mode
-                  <form onSubmit={(e) => { e.preventDefault(); handleUpdateFolder(folder.id) }} className="flex items-center gap-1">
+                  <form onSubmit={(e) => { e.preventDefault(); handleUpdateFolder(folder.id) }} className="flex items-center gap-1 px-2 py-1.5">
                     <input
                       type="text"
                       value={editingFolderName}
@@ -228,18 +228,19 @@ export function MenuSidebar({
                     </button>
                   </form>
                 ) : (
-                  // Display mode - button contains icon, name, and badge for consistent alignment
+                  // Display mode - aligned with icon/text on left, badge on right
                   <div className="relative flex items-center">
                     <button
                       onClick={() => onFolderSelect(folder.id)}
-                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors ${
+                      className={`w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md transition-colors ${
                         selectedFolderId === folder.id
                           ? 'bg-purple-500/10 text-purple-600'
                           : 'hover:bg-accent text-muted-foreground hover:text-foreground'
                       }`}
                     >
+                      {/* Folder icon - clickable to change emoji */}
                       <span
-                        className="text-sm cursor-pointer hover:scale-125 transition-transform flex-shrink-0"
+                        className="text-sm cursor-pointer hover:scale-125 transition-transform flex-shrink-0 leading-none"
                         onClick={(e) => {
                           e.stopPropagation()
                           // Show emoji picker (for now, cycle through emojis)
@@ -251,10 +252,13 @@ export function MenuSidebar({
                       >
                         {folder.icon || '📁'}
                       </span>
+
+                      {/* Folder name */}
                       <span className="text-xs flex-1 text-left truncate">
                         {folder.name}
                       </span>
-                      {/* Counter badge - inside button for alignment with All Snippets/Uncategorized */}
+
+                      {/* Badge */}
                       <span className={`text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${
                         selectedFolderId === folder.id ? 'bg-purple-500/20' : 'bg-muted'
                       }`}>
@@ -263,7 +267,7 @@ export function MenuSidebar({
                     </button>
 
                     {/* Edit/Delete buttons - absolutely positioned to not affect badge alignment */}
-                    <div className="absolute right-8 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute right-10 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
