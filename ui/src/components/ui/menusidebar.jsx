@@ -21,7 +21,8 @@ export function MenuSidebar({
   onCreateFolder,
   onUpdateFolder,
   onDeleteFolder,
-  snippets
+  snippets,
+  files
 }) {
   const [showCreateFolder, setShowCreateFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
@@ -43,15 +44,18 @@ export function MenuSidebar({
     { id: 'account', icon: User, label: 'Account', badge: 'DEV' }
   ]
 
-  // Count snippets per folder
+  // Count items per folder (snippets or files based on active menu)
   const getFolderCount = (folderId) => {
+    // Use files when in files menu, otherwise use snippets
+    const items = activeMenu === 'files' ? files : snippets
+
     if (folderId === 'all') {
-      return snippets.length
+      return items.length
     }
     if (folderId === 'uncategorized') {
-      return snippets.filter(s => !s.folder_id).length
+      return items.filter(item => !item.folder_id).length
     }
-    return snippets.filter(s => s.folder_id === folderId).length
+    return items.filter(item => item.folder_id === folderId).length
   }
 
   const handleCreateFolder = async (e) => {
@@ -183,7 +187,7 @@ export function MenuSidebar({
             </button>
 
             {/* Uncategorized */}
-            {snippets.some(s => !s.folder_id) && (
+            {(activeMenu === 'files' ? files : snippets).some(item => !item.folder_id) && (
               <button
                 onClick={() => onFolderSelect('uncategorized')}
                 className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors ${

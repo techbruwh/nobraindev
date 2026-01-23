@@ -28,7 +28,6 @@ export function SnippetsPanel({
   const isSignedIn = !!user
   const snippetRefs = useRef({})
   const containerRef = useRef(null)
-  const [deletingId, setDeletingId] = useState(null)
 
   // Sync state
   const [isSyncing, setIsSyncing] = useState(false)
@@ -125,9 +124,7 @@ export function SnippetsPanel({
 
   const handleDeleteClick = (e, snippet) => {
     e.stopPropagation()
-    setDeletingId(snippet.id)
     onDeleteSnippet?.(snippet)
-    setDeletingId(null)
   }
 
   const handleCopySnippet = async (e, content) => {
@@ -281,6 +278,24 @@ export function SnippetsPanel({
                             NEW
                           </Badge>
                         )}
+                        {/* Sync status badge */}
+                        {isSignedIn && (
+                          <Badge
+                            variant="outline"
+                            className={`text-[7px] px-1 py-0 ${
+                              newSnippetIds.has(snippet.id)
+                                ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30'
+                                : 'bg-green-500/10 text-green-600 border-green-500/30'
+                            }`}
+                            title={newSnippetIds.has(snippet.id) ? 'Not synced to cloud' : 'Synced to cloud'}
+                          >
+                            {newSnippetIds.has(snippet.id) ? (
+                              <Cloud className="h-2.5 w-2.5" />
+                            ) : (
+                              <CheckCircle className="h-2.5 w-2.5" />
+                            )}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
@@ -300,7 +315,7 @@ export function SnippetsPanel({
                         variant="ghost"
                         className="h-5 w-5 p-0 text-destructive hover:text-destructive"
                         onClick={(e) => handleDeleteClick(e, snippet)}
-                        disabled={deletingId === snippet.id || isDeleting}
+                        disabled={isDeleting}
                       >
                         <Trash2 className="h-2.5 w-2.5" />
                       </Button>
@@ -318,6 +333,24 @@ export function SnippetsPanel({
                           {newSnippetIds.has(snippet.id) && (
                             <Badge className="text-[8px] px-1.5 py-0 bg-green-500 text-white hover:bg-green-600">
                               NEW
+                            </Badge>
+                          )}
+                          {/* Sync status badge */}
+                          {isSignedIn && (
+                            <Badge
+                              variant="outline"
+                              className={`text-[7px] px-1 py-0 ${
+                                newSnippetIds.has(snippet.id)
+                                  ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30'
+                                  : 'bg-green-500/10 text-green-600 border-green-500/30'
+                              }`}
+                              title={newSnippetIds.has(snippet.id) ? 'Not synced to cloud' : 'Synced to cloud'}
+                            >
+                              {newSnippetIds.has(snippet.id) ? (
+                                <Cloud className="h-2.5 w-2.5" />
+                              ) : (
+                                <CheckCircle className="h-2.5 w-2.5" />
+                              )}
                             </Badge>
                           )}
                         </div>
@@ -350,7 +383,7 @@ export function SnippetsPanel({
                         variant="ghost"
                         className="h-7 px-2 text-[9px] text-destructive hover:text-destructive"
                         onClick={(e) => handleDeleteClick(e, snippet)}
-                        disabled={deletingId === snippet.id || isDeleting}
+                        disabled={isDeleting}
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>

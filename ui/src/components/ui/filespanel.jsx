@@ -1,4 +1,4 @@
-import { Search, Plus, FileText, Trash2, AlertCircle, RefreshCw, CheckCircle, Loader2, ArrowUp, Shield, List, LayoutList, Upload, FileImage, FileVideo, FileAudio, Code, File, Archive, Download } from 'lucide-react'
+import { Search, Plus, FileText, Trash2, AlertCircle, RefreshCw, CheckCircle, Loader2, ArrowUp, Shield, List, LayoutList, Upload, FileImage, FileVideo, FileAudio, Code, File, Archive, Download, Cloud } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useEffect, useState } from 'react'
@@ -30,6 +30,9 @@ export function FilesPanel({
   const [error, setError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [uploadingFile, setUploadingFile] = useState(null)
+
+  // Calculate if there are any unsynced files (files without cloud_storage_path)
+  const hasUnsyncedFiles = files.some(file => !file.cloud_storage_path)
 
   // Sync state
   const [isSyncing, setIsSyncing] = useState(false)
@@ -220,10 +223,10 @@ export function FilesPanel({
     const email = user?.email
     if (!email) return
 
-    if (!hasUnsyncedChanges) {
+    if (!hasUnsyncedFiles) {
       setSyncStatus({
         type: 'success',
-        message: 'Secured cloud sync successful'
+        message: 'All files are synced'
       })
       setTimeout(() => setSyncStatus(null), 3000)
       return
@@ -240,6 +243,9 @@ export function FilesPanel({
         type: 'success',
         message: 'Secured cloud sync successful'
       })
+
+      // Reload files to get updated cloud_storage_path
+      await loadFiles()
 
       onSyncComplete?.(result.syncTime)
 
@@ -319,21 +325,21 @@ export function FilesPanel({
               variant="ghost"
               size="sm"
               className={`h-7 px-2 text-[9px] gap-1 ${
-                hasUnsyncedChanges && !isSyncing
+                hasUnsyncedFiles && !isSyncing
                   ? 'bg-yellow-500/20 text-yellow-600 hover:bg-yellow-500/30 hover:text-yellow-700'
                   : ''
               }`}
-              disabled={!hasUnsyncedChanges || isSyncing}
+              disabled={!hasUnsyncedFiles || isSyncing}
               onClick={handleSync}
             >
               {isSyncing ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
-              ) : hasUnsyncedChanges ? (
+              ) : hasUnsyncedFiles ? (
                 <ArrowUp className="h-3 w-3" />
               ) : (
                 <CheckCircle className="h-3 w-3" />
               )}
-              {isSyncing ? 'Syncing...' : hasUnsyncedChanges ? 'Sync' : 'Synced'}
+              {isSyncing ? 'Syncing...' : hasUnsyncedFiles ? 'Sync' : 'Synced'}
             </Button>
           )}
         </div>
@@ -424,6 +430,24 @@ export function FilesPanel({
                         <Badge variant="secondary" className="text-[7px]">
                           {file.file_type}
                         </Badge>
+                        {/* Sync status badge */}
+                        {isSignedIn && (
+                          <Badge
+                            variant="outline"
+                            className={`text-[7px] px-1 py-0 ${
+                              !file.cloud_storage_path
+                                ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30'
+                                : 'bg-green-500/10 text-green-600 border-green-500/30'
+                            }`}
+                            title={!file.cloud_storage_path ? 'Not synced to cloud' : 'Synced to cloud'}
+                          >
+                            {!file.cloud_storage_path ? (
+                              <Cloud className="h-2.5 w-2.5" />
+                            ) : (
+                              <CheckCircle className="h-2.5 w-2.5" />
+                            )}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
@@ -461,6 +485,24 @@ export function FilesPanel({
                           <Badge variant="secondary" className="text-[8px]">
                             {file.file_type}
                           </Badge>
+                          {/* Sync status badge */}
+                          {isSignedIn && (
+                            <Badge
+                              variant="outline"
+                              className={`text-[7px] px-1 py-0 ${
+                                !file.cloud_storage_path
+                                  ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30'
+                                  : 'bg-green-500/10 text-green-600 border-green-500/30'
+                              }`}
+                              title={!file.cloud_storage_path ? 'Not synced to cloud' : 'Synced to cloud'}
+                            >
+                              {!file.cloud_storage_path ? (
+                                <Cloud className="h-2.5 w-2.5" />
+                              ) : (
+                                <CheckCircle className="h-2.5 w-2.5" />
+                              )}
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                           <span>{formatFileSize(file.file_size)}</span>

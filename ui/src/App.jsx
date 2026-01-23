@@ -108,9 +108,12 @@ function App() {
 
   // Folder state
   const [folders, setFolders] = useState([])
-  const [selectedFolderId, setSelectedFolderId] = useState(null) // null = all snippets
+  const [selectedFolderId, setSelectedFolderId] = useState(null) // null = all snippets/files
   const [showOrganizeModal, setShowOrganizeModal] = useState(false)
   const [hasSeenOrganizeModal, setHasSeenOrganizeModal] = useState(false)
+
+  // Files state (for badge counts in sidebar)
+  const [files, setFiles] = useState([])
 
   // Track newly created snippet IDs
   const [newSnippetIds, setNewSnippetIds] = useState(new Set())
@@ -474,8 +477,33 @@ function App() {
     try {
       const data = await invoke('get_all_folders')
       setFolders(data)
+
+      // Also load files for badge counts
+      if (activeMenu === 'files') {
+        loadFiles()
+      }
     } catch (error) {
       console.error('Failed to load folders:', error)
+    }
+  }
+
+  const loadFiles = async () => {
+    try {
+      let result
+      if (selectedFolderId === null) {
+        // All files
+        result = await invoke('get_all_files')
+      } else if (selectedFolderId === 'uncategorized') {
+        // Uncategorized files
+        result = await invoke('get_files_by_folder', { folderId: null })
+      } else {
+        // Specific folder
+        result = await invoke('get_files_by_folder', { folderId: selectedFolderId })
+      }
+      setFiles(result || [])
+    } catch (error) {
+      console.error('Failed to load files:', error)
+      setFiles([])
     }
   }
 
@@ -519,9 +547,13 @@ function App() {
     try {
       await invoke('update_folder', { id: folderId, name, icon })
       await loadFolders()
-      // Reload snippets if we changed the currently selected folder
+      // Reload snippets/files if we changed the currently selected folder
       if (selectedFolderId === folderId) {
-        await loadSnippets()
+        if (activeMenu === 'files') {
+          await loadFiles()
+        } else {
+          await loadSnippets()
+        }
       }
       showToast('Folder updated', 'success')
     } catch (error) {
@@ -530,9 +562,26 @@ function App() {
     }
   }
 
+  const handleMenuChange = async (menu) => {
+    setActiveMenu(menu)
+
+    // Load files when switching to files menu
+    if (menu === 'files') {
+      await loadFiles()
+    }
+  }
+
   const handleFolderSelect = async (folderId) => {
     setSelectedFolderId(folderId)
 
+    // Load based on active menu
+    if (activeMenu === 'files') {
+      // Load files for badge count
+      await loadFiles()
+      return
+    }
+
+    // Original snippets loading logic
     try {
       let data
 
@@ -1095,7 +1144,7 @@ function App() {
         {/* Menu Sidebar - Always visible */}
         <MenuSidebar
           activeMenu={activeMenu}
-          onMenuChange={setActiveMenu}
+          onMenuChange={handleMenuChange}
           sidebarCollapsed={sidebarCollapsed}
           folders={folders}
           selectedFolderId={selectedFolderId}
@@ -1104,6 +1153,7 @@ function App() {
           onUpdateFolder={handleUpdateFolder}
           onDeleteFolder={handleDeleteFolder}
           snippets={snippets}
+          files={files}
         />
 
         {/* Resizable Content Sidebar */}
