@@ -1,12 +1,15 @@
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { Clipboard, Trash2, Copy, FileCode, Search, RefreshCw, AlertCircle, CheckCircle, Keyboard, Sparkles, Clock, Info } from 'lucide-react'
+import { Clipboard, Trash2, Copy, FileCode, Search, RefreshCw, AlertCircle, CheckCircle, Keyboard, Sparkles, Clock, Info, Cloud, ArrowUp, Loader2 } from 'lucide-react'
 import { clipboardService } from '@/lib/clipboard'
 import { useSupabaseAuth } from '@/lib/supabase-auth'
 import { syncService } from '@/lib/sync'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+
+// Module-level variable to persist synced clipboard entry IDs across component unmounts/remounts
+let globallySyncedClipboardIds = new Set()
 
 export const ClipboardMainView = forwardRef(({ onConvertToSnippet, onClipboardChanged, hasUnsyncedClipboard, onClipboardSyncComplete, selectedEntryId, onEntrySelect }, ref) => {
   const { user } = useSupabaseAuth()
@@ -105,6 +108,8 @@ export const ClipboardMainView = forwardRef(({ onConvertToSnippet, onClipboardCh
       if (result.isNew) {
         // Reload history to show the new entry
         await loadClipboardHistory()
+        // Clear synced IDs since new clipboard entries were added
+        globallySyncedClipboardIds.clear()
         // Trigger sync button enable
         onClipboardChanged?.()
       } else {
@@ -276,6 +281,9 @@ export const ClipboardMainView = forwardRef(({ onConvertToSnippet, onClipboardCh
       // Reload clipboard after sync
       await loadClipboardHistory()
 
+      // Mark all current clipboard entries as synced (to persist across re-renders/menu switches/unmounts)
+      globallySyncedClipboardIds = new Set(history.map(e => e.id))
+
       // Create user-friendly message
       const message = 'Secured cloud sync successful'
 
@@ -354,9 +362,9 @@ export const ClipboardMainView = forwardRef(({ onConvertToSnippet, onClipboardCh
                 onClick={handleSync}
               >
                 {isSyncing ? (
-                  <RefreshCw className="h-3 w-3 animate-spin" />
+                  <Loader2 className="h-3 w-3 animate-spin" />
                 ) : hasUnsyncedClipboard ? (
-                  <Sparkles className="h-3 w-3" />
+                  <ArrowUp className="h-3 w-3" />
                 ) : (
                   <CheckCircle className="h-3 w-3" />
                 )}
@@ -443,6 +451,24 @@ export const ClipboardMainView = forwardRef(({ onConvertToSnippet, onClipboardCh
                         <p className="text-[10px] text-muted-foreground">
                           {new Date(entry.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </p>
+                        {/* Sync status badge */}
+                        {isSignedIn && (
+                          <Badge
+                            variant="outline"
+                            className={`text-[7px] px-1 py-0 ${
+                              !globallySyncedClipboardIds.has(entry.id)
+                                ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30'
+                                : 'bg-green-500/10 text-green-600 border-green-500/30'
+                            }`}
+                            title={!globallySyncedClipboardIds.has(entry.id) ? 'Not synced to cloud' : 'Synced to cloud'}
+                          >
+                            {!globallySyncedClipboardIds.has(entry.id) ? (
+                              <Cloud className="h-2.5 w-2.5" />
+                            ) : (
+                              <CheckCircle className="h-2.5 w-2.5" />
+                            )}
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-xs text-foreground break-words line-clamp-2 font-mono leading-relaxed">
                         {entry.content.replace(/<[^>]*>/g, '')}
