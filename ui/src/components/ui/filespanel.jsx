@@ -179,6 +179,13 @@ export function FilesPanel({
     onDeleteFile?.(file)
   }
 
+  // Handle file preview
+  const handleFilePreview = (e, file) => {
+    e.stopPropagation()
+    // Call parent handler to show file preview inline
+    onFileSelect?.(file)
+  }
+
   // Handle file download
   const handleDownloadFile = async (e, file) => {
     e.stopPropagation()

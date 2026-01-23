@@ -4,10 +4,11 @@ import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { listen } from '@tauri-apps/api/event'
 import { open } from '@tauri-apps/plugin-shell'
-import { Plus, Search, FileCode, X, Edit, Trash2, Copy, Save, Brain, Download, Sparkles, CheckCircle, AlertCircle, Info, PanelLeftClose, PanelLeft, Keyboard, Code, Braces, RefreshCw, Cloud, User, List, LayoutList } from 'lucide-react'
+import { Plus, Search, FileCode, FileText, X, Edit, Trash2, Copy, Save, Brain, Download, Sparkles, CheckCircle, AlertCircle, Info, PanelLeftClose, PanelLeft, Keyboard, Code, Braces, RefreshCw, Cloud, User, List, LayoutList } from 'lucide-react'
 import { useSupabaseAuth } from '@/lib/supabase-auth'
 import { syncService } from '@/lib/sync'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { SearchBar } from '@/components/ui/searchbar'
 import { SearchModal } from '@/components/ui/searchmodal'
 import { ConfirmDialog } from '@/components/ui/confirmdialog'
@@ -102,7 +103,6 @@ function App() {
 
   // File state
   const [selectedFile, setSelectedFile] = useState(null)
-  const [showFilePreview, setShowFilePreview] = useState(false)
   const [hasUnsyncedFiles, setHasUnsyncedFiles] = useState(false)
   const [filesReloadCounter, setFilesReloadCounter] = useState(0)
 
@@ -1060,7 +1060,6 @@ function App() {
           // Clear selected file if it was deleted
           if (selectedFile?.id === file.id) {
             setSelectedFile(null)
-            setShowFilePreview(false)
           }
 
           // Force a reload of files by incrementing a counter
@@ -1237,7 +1236,6 @@ function App() {
               }
               onFileSelect={(file) => {
                 setSelectedFile(file)
-                setShowFilePreview(true)
               }}
               onUploadComplete={() => setHasUnsyncedFiles(true)}
               hasUnsyncedChanges={hasUnsyncedFiles}
@@ -1266,8 +1264,102 @@ function App() {
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          {/* Show Clipboard Main View when clipboard is active */}
-          {activeMenu === 'clipboard' ? (
+          {/* Show File Preview when file is selected (inline, like snippets) */}
+          {activeMenu === 'files' && selectedFile ? (
+            <>
+              {/* Top Bar */}
+              <div className="border-b px-3 py-1.5 flex items-center gap-2 bg-background">
+                {/* Folder Selector */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground">Folder:</span>
+                  <select
+                    value={selectedFile.folder_id || 'none'}
+                    onChange={async (e) => {
+                      const newFolderId = e.target.value === 'none' ? null : parseInt(e.target.value)
+                      const updatedFile = {
+                        ...selectedFile,
+                        folder_id: newFolderId
+                      }
+
+                      try {
+                        await invoke('update_file', {
+                          id: selectedFile.id,
+                          filename: selectedFile.filename,
+                          description: selectedFile.description,
+                          tags: selectedFile.tags,
+                          folderId: newFolderId
+                        })
+
+                        // Update local state
+                        setSelectedFile(updatedFile)
+                        setHasUnsyncedFiles(true)
+
+                        // Reload to update folder counts
+                        const updatedFiles = await invoke('get_all_files')
+                        setAllFiles(updatedFiles)
+                        await loadFolders()
+
+                        showToast('Folder updated', 'success')
+                      } catch (error) {
+                        console.error('Failed to update folder:', error)
+                        showToast('Failed to update folder', 'error')
+                      }
+                    }}
+                    className="h-7 px-2 text-[10px] bg-background border border-border rounded-md hover:bg-accent focus:outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer"
+                  >
+                    <option value="none">Uncategorized</option>
+                    {folders.map((folder) => (
+                      <option key={folder.id} value={folder.id}>
+                        {folder.icon || '📁'} {folder.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* File info */}
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className="text-xs font-medium truncate">{selectedFile.filename}</span>
+                  <Badge variant="secondary" className="text-[9px]">
+                    {selectedFile.file_type}
+                  </Badge>
+                  <span className="text-[10px] text-muted-foreground">
+                    {selectedFile.file_size ? `${(selectedFile.file_size / 1024).toFixed(1)} KB` : ''}
+                  </span>
+                </div>
+
+                {/* Close button on the right */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-[10px]"
+                  onClick={() => setSelectedFile(null)}
+                >
+                  Close
+                </Button>
+              </div>
+
+              {/* Content Area - File Preview */}
+              <div className="flex-1 overflow-auto">
+                <FilePreview
+                  file={selectedFile}
+                  onEdit={(file) => {
+                    setHasUnsyncedFiles(true)
+                  }}
+                />
+              </div>
+            </>
+          ) : activeMenu === 'files' ? (
+            // No file selected - show placeholder
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                <h2 className="text-lg font-semibold mb-1.5">Select a file</h2>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Or upload a new file to get started
+                </p>
+              </div>
+            </div>
+          ) : activeMenu === 'clipboard' ? (
             <div className="flex-1 overflow-hidden">
               <ClipboardMainView
                 ref={clipboardPanelRef}
@@ -1629,21 +1721,6 @@ function App() {
         folders={folders}
         onOrganize={handleOrganizeSnippets}
       />
-
-      {/* File Preview Modal */}
-      {showFilePreview && selectedFile && (
-        <FilePreview
-          file={selectedFile}
-          onClose={() => {
-            setShowFilePreview(false)
-            setSelectedFile(null)
-          }}
-          onEdit={(file) => {
-            // Handle file edit if needed
-            setHasUnsyncedFiles(true)
-          }}
-        />
-      )}
 
       {/* Confirmation Dialog */}
       <ConfirmDialog

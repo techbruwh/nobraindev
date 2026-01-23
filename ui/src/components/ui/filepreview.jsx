@@ -1,14 +1,14 @@
-import { X, Download, Edit, FileText, FileImage, FileVideo, FileAudio, Code, File, Loader2 } from 'lucide-react'
+import { Download, FileText, FileImage, FileVideo, FileAudio, Code, File, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useEffect, useState, useRef } from 'react'
+import { Badge } from '@/components/ui/badge'
+import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 
-export function FilePreview({ file, onClose, onEdit }) {
+export function FilePreview({ file, onEdit }) {
   const [fileData, setFileData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
-  const fileInputRef = useRef(null)
 
   // Load file data
   useEffect(() => {
@@ -35,39 +35,6 @@ export function FilePreview({ file, onClose, onEdit }) {
       setPreviewUrl(url)
     } catch (err) {
       console.error('Failed to load file:', err)
-      setError(err.toString())
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Handle file edit (replace file)
-  const handleEdit = async () => {
-    fileInputRef.current?.click()
-  }
-
-  const handleFileSelect = async (e) => {
-    const selectedFile = e.target.files?.[0]
-    if (!selectedFile) return
-
-    try {
-      setLoading(true)
-      const fileBytes = new Uint8Array(await selectedFile.arrayBuffer())
-
-      // Upload new file
-      await invoke('update_file', {
-        id: file.id,
-        filename: selectedFile.name,
-        description: file.description,
-        tags: file.tags,
-        folderId: file.folder_id
-      })
-
-      // Reload file data
-      await loadFileData()
-      onEdit?.(file)
-    } catch (err) {
-      console.error('Failed to update file:', err)
       setError(err.toString())
     } finally {
       setLoading(false)
@@ -200,65 +167,41 @@ export function FilePreview({ file, onClose, onEdit }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-background rounded-lg shadow-lg w-full max-w-6xl h-[80vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            {file.file_type === 'image' && <FileImage className="h-4 w-4 text-blue-500" />}
-            {file.file_type === 'video' && <FileVideo className="h-4 w-4 text-purple-500" />}
-            {file.file_type === 'audio' && <FileAudio className="h-4 w-4 text-green-500" />}
-            {(file.file_type === 'code' || file.file_type === 'text') && <Code className="h-4 w-4 text-yellow-500" />}
-            {file.file_type === 'document' && <FileText className="h-4 w-4 text-red-500" />}
-            {file.file_type === 'archive' && <File className="h-4 w-4 text-orange-500" />}
-            {!['image', 'video', 'audio', 'code', 'text', 'document', 'archive'].includes(file.file_type) && (
-              <File className="h-4 w-4 text-gray-500" />
-            )}
-            <div className="flex-1 min-w-0">
-              <h2 className="text-sm font-semibold truncate">{file.filename}</h2>
-              <p className="text-xs text-muted-foreground">
-                {file.file_type} • {(file.file_size / 1024).toFixed(1)} KB
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleDownload}
-              disabled={!fileData}
-            >
-              <Download className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleEdit}
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+    <div className="h-full flex flex-col">
+      {/* Metadata */}
+      {file.description && (
+        <div className="px-4 py-2 border-b">
+          <p className="text-xs text-muted-foreground">{file.description}</p>
         </div>
+      )}
 
-        {/* Content */}
-        <div className="flex-1 overflow-hidden">
-          {renderPreview()}
+      {file.tags && (
+        <div className="px-4 py-2 border-b flex flex-wrap gap-1">
+          {file.tags.split(',').map((tag, i) => (
+            <span key={i} className="text-[10px] px-2 py-0.5 bg-muted rounded-full">
+              {tag.trim()}
+            </span>
+          ))}
         </div>
+      )}
 
-        {/* Hidden file input for editing */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="hidden"
-          onChange={handleFileSelect}
-        />
+      {/* Preview */}
+      <div className="flex-1 min-h-0">
+        {renderPreview()}
+      </div>
+
+      {/* Action Bar */}
+      <div className="border-t p-2 flex items-center justify-center gap-2 bg-background">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 px-3 text-[10px]"
+          onClick={handleDownload}
+          disabled={!fileData}
+        >
+          <Download className="h-3 w-3 mr-1" />
+          Download
+        </Button>
       </div>
     </div>
   )
